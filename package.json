@@ -1,9 +1,18 @@
 {
-  "name": "APEX",
+  "name": "apex",
   "version": "1.0.0",
+  "private": true,
   "description": "APEX - Advanced Platform for Event Intelligence and Execution",
-  "scripts": {},
-  "keywords": [],
+  "scripts": {
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "keywords": [
+    "iot",
+    "surveillance",
+    "esp32",
+    "event-intelligence"
+  ],
   "author": "Sushrut Gondane",
   "license": "ISC",
   "packageManager": "pnpm@10.34.5"
