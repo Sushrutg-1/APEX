@@ -1,0 +1,10 @@
+{
+  "name": "APEX",
+  "version": "1.0.0",
+  "description": "APEX - Advanced Platform for Event Intelligence and Execution",
+  "scripts": {},
+  "keywords": [],
+  "author": "Sushrut Gondane",
+  "license": "ISC",
+  "packageManager": "pnpm@10.34.5"
+}
