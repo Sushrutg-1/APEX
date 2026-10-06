@@ -1,0 +1,52 @@
+/* =========================================================
+   APEX DASHBOARD SHELL
+   ========================================================= */
+
+.apex-dashboard-layout {
+  min-height: 100vh;
+
+  display: flex;
+
+  background: #f7f8fa;
+
+  color: #111827;
+}
+
+.apex-dashboard-main {
+  min-width: 0;
+
+  flex: 1;
+
+  display: flex;
+  flex-direction: column;
+}
+
+.apex-dashboard-content {
+  min-width: 0;
+
+  flex: 1;
+
+  padding: 28px 32px 32px;
+}
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+
+@media (max-width: 1100px) {
+  .apex-dashboard-content {
+    padding: 24px;
+  }
+}
+
+@media (max-width: 760px) {
+  .apex-dashboard-content {
+    padding: 20px;
+  }
+}
+
+@media (max-width: 600px) {
+  .apex-dashboard-content {
+    padding: 18px 14px 24px;
+  }
+}

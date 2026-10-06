@@ -1,0 +1,224 @@
+/* =========================================================
+   APEX SIDEBAR
+   ========================================================= */
+
+.apex-sidebar {
+  position: sticky;
+  top: 0;
+
+  width: 238px;
+  height: 100vh;
+
+  flex-shrink: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  background: #0b1220;
+
+  border-right: 1px solid #1e293b;
+
+  z-index: 30;
+}
+
+/* =========================================================
+   BRAND
+   ========================================================= */
+
+.apex-sidebar-brand {
+  height: 72px;
+
+  display: flex;
+  align-items: center;
+
+  padding: 0 24px;
+
+  border-bottom: 1px solid #1e293b;
+}
+
+.apex-sidebar-brand img {
+  width: 112px;
+  height: auto;
+
+  display: block;
+}
+
+/* =========================================================
+   NAVIGATION
+   ========================================================= */
+
+.apex-sidebar-nav {
+  flex: 1;
+
+  padding: 26px 14px;
+}
+
+.apex-sidebar-title {
+  display: block;
+
+  margin: 0 10px 12px;
+
+  color: #64748b;
+
+  font-size: 10px;
+  font-weight: 700;
+
+  letter-spacing: 0.12em;
+}
+
+.apex-sidebar-link {
+  height: 44px;
+
+  display: flex;
+  align-items: center;
+
+  gap: 12px;
+
+  margin-bottom: 4px;
+  padding: 0 12px;
+
+  border-radius: 7px;
+
+  color: #94a3b8;
+
+  font-size: 13px;
+  font-weight: 600;
+
+  text-decoration: none;
+
+  transition:
+    color 0.2s ease,
+    background 0.2s ease;
+}
+
+.apex-sidebar-link svg {
+  flex-shrink: 0;
+}
+
+.apex-sidebar-link:hover {
+  color: #f8fafc;
+  background: #162033;
+}
+
+.apex-sidebar-link.active {
+  color: #ffffff;
+  background: #1d4ed8;
+}
+
+.apex-sidebar-link.active svg {
+  color: #ffffff;
+}
+
+/* =========================================================
+   CONNECTION
+   ========================================================= */
+
+.apex-sidebar-bottom {
+  padding: 18px 14px;
+
+  border-top: 1px solid #1e293b;
+}
+
+.apex-sidebar-connection {
+  display: flex;
+  align-items: center;
+
+  gap: 10px;
+
+  padding: 11px 10px;
+
+  border-radius: 7px;
+
+  background: #0f1724;
+}
+
+.apex-sidebar-connection-dot {
+  width: 8px;
+  height: 8px;
+
+  flex-shrink: 0;
+
+  border-radius: 50%;
+}
+
+.apex-sidebar-connection-dot.online {
+  background: #16a34a;
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.12);
+}
+
+.apex-sidebar-connection-dot.offline {
+  background: #dc2626;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+}
+
+.apex-sidebar-connection div {
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  gap: 2px;
+}
+
+.apex-sidebar-connection strong {
+  color: #f8fafc;
+
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.apex-sidebar-connection span {
+  color: #64748b;
+
+  font-size: 10px;
+}
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+
+@media (max-width: 900px) {
+  .apex-sidebar {
+    width: 210px;
+  }
+}
+
+@media (max-width: 760px) {
+  .apex-sidebar {
+    width: 70px;
+  }
+
+  .apex-sidebar-brand {
+    justify-content: center;
+    padding: 0;
+  }
+
+  .apex-sidebar-brand img {
+    width: 34px;
+
+    object-fit: cover;
+    object-position: left;
+  }
+
+  .apex-sidebar-title,
+  .apex-sidebar-link span,
+  .apex-sidebar-connection div {
+    display: none;
+  }
+
+  .apex-sidebar-link {
+    justify-content: center;
+    padding: 0;
+  }
+
+  .apex-sidebar-connection {
+    justify-content: center;
+    padding: 11px 0;
+  }
+}
+
+@media (max-width: 600px) {
+  .apex-sidebar {
+    display: none;
+  }
+}
