@@ -6,6 +6,7 @@ import env from './config/env.config.js';
 
 import authRoutes from './routes/auth.routes.js';
 import testRoutes from './routes/test.routes.js';
+import vehicleRoutes from './routes/vehicle.routes.js';
 
 import errorHandler from './middlewares/errorHandler.middleware.js';
 
@@ -32,6 +33,7 @@ app.get('/health-check', (req, res) => {
 
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/test', testRoutes);
+app.use('/api/v1/vehicles', vehicleRoutes);
 
 app.use(errorHandler);
 

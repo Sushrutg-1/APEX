@@ -1,5 +1,4 @@
-import './Home.css';
-import { useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Activity,
   AlertTriangle,
@@ -11,30 +10,206 @@ import {
   Wifi,
   WifiOff,
 } from 'lucide-react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 
-import {
-  updateTelemetry,
-  vehicleOnline,
-  vehicleOffline,
-  websocketConnected,
-  websocketDisconnected,
-} from '../../redux/slices/vehicleSlice';
-
-import websocketService from '../../services/websocket.service';
-
+import cameraService from '../../features/camera/camera.service';
+import CameraFeed from '../../features/camera/CameraFeed';
+import { distanceBetweenMeters, isValidCoordinates } from '../../utils/geography';
+import { getCurrentWeather } from '../../services/weather.service';
 import './Home.css';
 
+const WEATHER_REFRESH_INTERVAL_MS = 10 * 60 * 1000;
+const WEATHER_MOVEMENT_THRESHOLD_METERS = 1000;
+
+const formatCoordinate = (value, positiveDirection, negativeDirection) =>
+  `${Math.abs(value).toFixed(5)}° ${value < 0 ? negativeDirection : positiveDirection}`;
+
+function WeatherCard({ location, weather, onWeatherChange }) {
+  const [weatherStatus, setWeatherStatus] = useState('WAITING');
+  const locationRef = useRef(location);
+  const lastRequestRef = useRef(null);
+  const inFlightRef = useRef(false);
+  const gpsWasUnavailableRef = useRef(true);
+  const requestRef = useRef(null);
+  const refreshWeatherRef = useRef(null);
+
+  const refreshWeather = useCallback(async (coordinates) => {
+    if (inFlightRef.current || !coordinates) {
+      return;
+    }
+
+    inFlightRef.current = true;
+    lastRequestRef.current = {
+      ...coordinates,
+      requestedAt: Date.now(),
+    };
+    const abortController = new AbortController();
+    requestRef.current = abortController;
+    setWeatherStatus('LOADING');
+
+    try {
+      const result = await getCurrentWeather(
+        coordinates.latitude,
+        coordinates.longitude,
+        abortController.signal
+      );
+      if (!abortController.signal.aborted) {
+        onWeatherChange(result);
+        setWeatherStatus('AVAILABLE');
+      }
+    } catch (error) {
+      if (!abortController.signal.aborted) {
+        onWeatherChange(null);
+        setWeatherStatus('UNAVAILABLE');
+        console.error('Unable to retrieve current weather:', error.message);
+      }
+    } finally {
+      const isCurrentRequest = requestRef.current === abortController;
+      if (isCurrentRequest) {
+        inFlightRef.current = false;
+        requestRef.current = null;
+      }
+
+      const latest = locationRef.current;
+      if (
+        isCurrentRequest &&
+        !abortController.signal.aborted &&
+        latest &&
+        distanceBetweenMeters(
+          coordinates.latitude,
+          coordinates.longitude,
+          latest.latitude,
+          latest.longitude
+        ) >= WEATHER_MOVEMENT_THRESHOLD_METERS
+      ) {
+        void refreshWeatherRef.current?.(latest);
+      }
+    }
+  }, [onWeatherChange]);
+
+  useEffect(() => {
+    refreshWeatherRef.current = refreshWeather;
+    locationRef.current = location;
+
+    if (!location) {
+      gpsWasUnavailableRef.current = true;
+      requestRef.current?.abort();
+      requestRef.current = null;
+      inFlightRef.current = false;
+      onWeatherChange(null);
+      return;
+    }
+
+    const previous = lastRequestRef.current;
+    const movedMeaningfully =
+      previous &&
+      distanceBetweenMeters(
+        previous.latitude,
+        previous.longitude,
+        location.latitude,
+        location.longitude
+      ) >= WEATHER_MOVEMENT_THRESHOLD_METERS;
+    const refreshIsDue =
+      previous && Date.now() - previous.requestedAt >= WEATHER_REFRESH_INTERVAL_MS;
+
+    if (!previous || gpsWasUnavailableRef.current || movedMeaningfully || refreshIsDue) {
+      gpsWasUnavailableRef.current = false;
+      void refreshWeather(location);
+    }
+  }, [location, onWeatherChange, refreshWeather]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const lastRequest = lastRequestRef.current;
+      const currentLocation = locationRef.current;
+      if (
+        currentLocation &&
+        lastRequest &&
+        Date.now() - lastRequest.requestedAt >= WEATHER_REFRESH_INTERVAL_MS
+      ) {
+        void refreshWeatherRef.current?.(currentLocation);
+      }
+    }, 60000);
+
+    return () => {
+      clearInterval(interval);
+      requestRef.current?.abort();
+      requestRef.current = null;
+      inFlightRef.current = false;
+      gpsWasUnavailableRef.current = true;
+    };
+  }, [refreshWeather]);
+
+  const locationText = location
+    ? `${formatCoordinate(location.latitude, 'N', 'S')}, ${formatCoordinate(
+        location.longitude,
+        'E',
+        'W'
+      )}`
+    : 'Waiting for GPS location';
+  const displayStatus = location ? weatherStatus : 'WAITING';
+
+  return (
+    <section className="home-weather-card" aria-live="polite">
+      <div className="home-weather-header">
+        <div>
+          <span className="home-section-eyebrow">CURRENT WEATHER</span>
+          <h2>Vehicle Location</h2>
+        </div>
+        <span className={`home-weather-status ${displayStatus.toLowerCase()}`}>
+          {displayStatus === 'AVAILABLE'
+            ? 'Current'
+            : displayStatus === 'LOADING'
+              ? 'Updating'
+              : 'Weather unavailable'}
+        </span>
+      </div>
+
+      <p className="home-weather-location">{locationText}</p>
+
+      {displayStatus === 'AVAILABLE' && weather ? (
+        <div className="home-weather-values">
+          <div className="home-weather-primary">
+            <strong>{weather.temperature.toFixed(1)}°C</strong>
+            <span>{weather.condition}</span>
+          </div>
+          <div>
+            <span>Feels like</span>
+            <strong>{weather.apparentTemperature.toFixed(1)}°C</strong>
+          </div>
+          <div>
+            <span>Humidity</span>
+            <strong>{weather.humidity}%</strong>
+          </div>
+          <div>
+            <span>Wind</span>
+            <strong>{weather.windSpeed.toFixed(1)} km/h</strong>
+          </div>
+        </div>
+      ) : (
+        <p className="home-weather-message">
+          {!location
+            ? 'Weather unavailable · Waiting for GPS location'
+            : displayStatus === 'LOADING'
+              ? 'Retrieving current weather for the rover location...'
+              : 'Weather unavailable · Unable to retrieve current weather.'}
+        </p>
+      )}
+    </section>
+  );
+}
+
 function Home() {
-  const dispatch = useDispatch();
-
   const { vehicle } = useSelector((state) => state.auth);
-
   const {
     status,
     telemetry,
     websocketConnected: wsConnected,
+    websocketStatus,
+    geofence,
   } = useSelector((state) => state.vehicle);
+  const [cameraStatus, setCameraStatus] = useState('UNAVAILABLE');
+  const [weather, setWeather] = useState(null);
 
   const vehicleId = vehicle?.vehicleId || 'Unavailable';
   const vehicleName = vehicle?.name || 'Unavailable';
@@ -44,65 +219,25 @@ function Home() {
    */
   const data = status === 'online' ? telemetry : null;
 
-  useEffect(() => {
-    websocketService.connect();
-
-    const unsubscribe = websocketService.subscribe((message) => {
-      if (!message) {
-        return;
-      }
-
-      /*
-       * Dashboard WebSocket connected.
-       */
-      if (message.type === 'WS_OPEN') {
-        dispatch(websocketConnected());
-        return;
-      }
-
-      /*
-       * Dashboard WebSocket disconnected.
-       */
-      if (message.type === 'WS_CLOSE') {
-        dispatch(websocketDisconnected());
-        return;
-      }
-
-      /*
-       * ESP32 online/offline.
-       */
-      if (message.type === 'DEVICE_STATUS') {
-        if (message.status === 'online') {
-          dispatch(vehicleOnline());
+  useEffect(
+    () =>
+      cameraService.subscribe((message) => {
+        if (message.type === 'STATUS') {
+          setCameraStatus(message.status);
         }
-
-        if (message.status === 'offline') {
-          dispatch(vehicleOffline());
-        }
-
-        return;
-      }
-
-      /*
-       * Real ESP32 telemetry.
-       */
-      if (message.type === 'TELEMETRY') {
-        dispatch(updateTelemetry(message.data ?? null));
-      }
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, [dispatch]);
+      }),
+    []
+  );
 
   const isOnline = status === 'online';
 
   const statusClass = isOnline
     ? 'home-status home-status-online'
-    : 'home-status home-status-offline';
+    : status === 'offline'
+      ? 'home-status home-status-offline'
+      : 'home-status home-status-connecting';
 
-  const statusText = isOnline ? 'Online' : 'Offline';
+  const statusText = isOnline ? 'Online' : status === 'offline' ? 'Offline' : 'Connecting';
 
   const formatValue = (value, suffix = '') => {
     if (value === null || value === undefined) {
@@ -140,13 +275,33 @@ function Home() {
   };
 
   const gpsLocation =
-    data?.gpsFix === true &&
-    data?.latitude !== null &&
-    data?.longitude !== null &&
-    data?.latitude !== undefined &&
-    data?.longitude !== undefined
+    data?.gpsFix === true && isValidCoordinates(data.latitude, data.longitude)
       ? `${Number(data.latitude).toFixed(6)}, ${Number(data.longitude).toFixed(6)}`
       : 'Unavailable';
+  const hasValidGeofence =
+    geofence?.enabled === true &&
+    isValidCoordinates(geofence.latitude, geofence.longitude) &&
+    Number.isFinite(geofence.radiusMeters) &&
+    geofence.radiusMeters > 0;
+  const geofenceStatus = !hasValidGeofence
+    ? geofence?.latitude !== null && geofence?.latitude !== undefined
+      ? 'Geofence disabled'
+      : 'No geofence configured'
+    : !data?.gpsFix ||
+        !isValidCoordinates(data.latitude, data.longitude)
+      ? 'GPS Unavailable'
+      : distanceBetweenMeters(
+            data.latitude,
+            data.longitude,
+            geofence.latitude,
+            geofence.longitude
+          ) <= geofence.radiusMeters
+        ? 'Inside Geofence'
+        : 'Outside Geofence';
+  const weatherLocation =
+    data?.gpsFix === true && isValidCoordinates(data.latitude, data.longitude)
+      ? { latitude: data.latitude, longitude: data.longitude }
+      : null;
 
   return (
     <main className="dashboard-page home-page">
@@ -176,18 +331,26 @@ function Home() {
       <section className="home-status-card">
         <div className="home-status-main">
           <div className="home-status-icon">
-            {isOnline ? <Wifi size={22} /> : <WifiOff size={22} />}
+            {isOnline ? <Wifi size={22} /> : status === 'offline' ? <WifiOff size={22} /> : <Wifi size={22} />}
           </div>
 
           <div>
             <span className="home-card-label">ROVER STATUS</span>
 
-            <h2>{isOnline ? 'Rover Online' : 'Rover Offline'}</h2>
+            <h2>
+              {isOnline
+                ? 'Rover Online'
+                : status === 'offline'
+                  ? 'Rover Offline'
+                  : 'Connecting to rover'}
+            </h2>
 
             <p>
               {isOnline
                 ? 'The rover is connected and sending live telemetry.'
-                : 'The rover is disconnected. Live telemetry is unavailable.'}
+                : status === 'offline'
+                  ? 'The rover is disconnected. Live telemetry is unavailable.'
+                  : 'Waiting for device connection status.'}
             </p>
           </div>
         </div>
@@ -205,7 +368,9 @@ function Home() {
 
           <div>
             <span>Dashboard Connection</span>
-            <strong>{wsConnected ? 'Connected' : 'Disconnected'}</strong>
+            <strong>
+              {wsConnected ? 'CONNECTED' : websocketStatus}
+            </strong>
           </div>
         </div>
       </section>
@@ -274,6 +439,27 @@ function Home() {
         </div>
       </section>
 
+      <section className="home-geofence-card">
+        <div>
+          <span className="home-section-eyebrow">GEOFENCE</span>
+          <h2>Vehicle boundary</h2>
+          <p
+            className={geofenceStatus === 'Outside Geofence' ? 'home-geofence-warning' : ''}
+            role="status"
+          >
+            {hasValidGeofence
+              ? `${geofenceStatus} · ${geofence.radiusMeters} m radius`
+              : geofenceStatus}
+          </p>
+        </div>
+      </section>
+
+      <WeatherCard
+        location={weatherLocation}
+        weather={weather}
+        onWeatherChange={setWeather}
+      />
+
       {/* ======================================================
           CAMERA + SYSTEM
       ====================================================== */}
@@ -288,32 +474,24 @@ function Home() {
             </div>
 
             <span
-              className={
-                isOnline
-                  ? 'home-camera-status home-camera-online'
-                  : 'home-camera-status home-camera-offline'
-              }
+              className={`home-camera-status ${
+                cameraStatus === 'CONNECTED' || cameraStatus === 'LIVE'
+                  ? 'home-camera-online'
+                  : 'home-camera-offline'
+              }`}
             >
               <span />
 
-              {isOnline ? 'Stream unavailable' : 'Rover offline'}
+              {cameraStatus === 'CONNECTED' || cameraStatus === 'LIVE'
+                ? 'Camera connected'
+                : cameraStatus === 'CONNECTING'
+                  ? 'Camera connecting'
+                  : 'Camera unavailable'}
             </span>
           </div>
 
           <div className="home-camera-view">
-            <div className="home-camera-empty">
-              <div className="home-camera-empty-icon">
-                <Camera size={30} />
-              </div>
-
-              <h3>{isOnline ? 'Camera stream unavailable' : 'Rover offline'}</h3>
-
-              <p>
-                {isOnline
-                  ? 'ESP32-CAM live streaming has not been connected yet.'
-                  : 'Connect the rover to access the camera stream.'}
-              </p>
-            </div>
+            <CameraFeed className="home-camera-empty" />
           </div>
         </div>
 
@@ -354,7 +532,13 @@ function Home() {
             <div className="home-system-row">
               <span>Alarm</span>
 
-              <strong>{data ? (data.alarm ? 'Active' : 'Inactive') : 'Unavailable'}</strong>
+              <strong>
+                {data?.alarm === true
+                  ? 'Active'
+                  : data?.alarm === false
+                    ? 'Inactive'
+                    : 'Unavailable'}
+              </strong>
             </div>
           </div>
         </div>
@@ -398,7 +582,13 @@ function Home() {
             <div>
               <span>Obstacle</span>
 
-              <strong>{data ? (data.obstacle ? 'Detected' : 'Clear') : 'Unavailable'}</strong>
+              <strong>
+                {data?.obstacle === true
+                  ? 'Detected'
+                  : data?.obstacle === false
+                    ? 'Clear'
+                    : 'Unavailable'}
+              </strong>
             </div>
           </div>
 
@@ -410,7 +600,13 @@ function Home() {
             <div>
               <span>Flame</span>
 
-              <strong>{data ? (data.flame ? 'Detected' : 'Clear') : 'Unavailable'}</strong>
+              <strong>
+                {data?.flame === true
+                  ? 'Detected'
+                  : data?.flame === false
+                    ? 'Clear'
+                    : 'Unavailable'}
+              </strong>
             </div>
           </div>
 
@@ -427,6 +623,52 @@ function Home() {
                   ? data.satellites
                   : 'Unavailable'}
               </strong>
+            </div>
+          </div>
+
+          <div className="home-sensor-card">
+            <div className="home-sensor-icon">
+              <MapPin size={19} />
+            </div>
+            <div>
+              <span>GPS Fix</span>
+              <strong>
+                {data?.gpsFix === true
+                  ? 'Acquired'
+                  : data?.gpsFix === false
+                    ? 'Waiting for GPS'
+                    : 'Unavailable'}
+              </strong>
+            </div>
+          </div>
+
+          <div className="home-sensor-card">
+            <div className="home-sensor-icon">
+              <Activity size={19} />
+            </div>
+            <div>
+              <span>Altitude</span>
+              <strong>{formatValue(data?.altitude, ' m')}</strong>
+            </div>
+          </div>
+
+          <div className="home-sensor-card">
+            <div className="home-sensor-icon">
+              <Activity size={19} />
+            </div>
+            <div>
+              <span>Temperature</span>
+              <strong>{formatValue(weather?.temperature, ' °C')}</strong>
+            </div>
+          </div>
+
+          <div className="home-sensor-card">
+            <div className="home-sensor-icon">
+              <Activity size={19} />
+            </div>
+            <div>
+              <span>Humidity</span>
+              <strong>{formatValue(weather?.humidity, '%')}</strong>
             </div>
           </div>
 

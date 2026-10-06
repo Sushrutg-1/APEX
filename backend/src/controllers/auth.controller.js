@@ -115,9 +115,26 @@ const refreshAccessToken = async (req, res, next) => {
       throw new ApiError(HTTP_STATUS.UNAUTHORIZED, API_MESSAGE.REFRESH_TOKEN_INVALID);
     }
 
+    const user = await User.findById(decodedToken.userId);
+
+    if (!user) {
+      throw new ApiError(HTTP_STATUS.UNAUTHORIZED, API_MESSAGE.REFRESH_TOKEN_INVALID);
+    }
+
+    const vehicle = await Vehicle.findOne({
+      vehicleId: user.vehicleId,
+      owner: user._id,
+    });
+
+    if (!vehicle) {
+      throw new ApiError(HTTP_STATUS.FORBIDDEN, API_MESSAGE.VEHICLE_NOT_ASSIGNED);
+    }
+
     const accessToken = jwt.sign(
       {
-        userId: decodedToken.userId,
+        userId: user._id.toString(),
+        username: user.username,
+        vehicleId: vehicle.vehicleId,
       },
       env.ACCESS_TOKEN_SECRET,
       {

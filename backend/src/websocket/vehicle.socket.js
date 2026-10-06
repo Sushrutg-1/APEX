@@ -11,7 +11,7 @@ import API_MESSAGE from '../constants/apiMessage.constant.js';
 /*
  * Handle dashboard/controller WebSocket connection.
  */
-const handleVehicleSocket = (socket) => {
+const handleVehicleSocket = (socket, vehicle) => {
   const { vehicleId } = socket.user;
 
   /*
@@ -42,6 +42,32 @@ const handleVehicleSocket = (socket) => {
       message: 'Controller connected successfully',
     })
   );
+
+  socket.send(
+    JSON.stringify({
+      type: 'DEVICE_STATUS',
+      vehicleId,
+      status: vehicle.status,
+    })
+  );
+
+  socket.send(
+    JSON.stringify({
+      type: 'GEOFENCE_STATUS',
+      vehicleId,
+      geofence: vehicle.geofence,
+    })
+  );
+
+  if (vehicle.status === 'online' && vehicle.telemetry) {
+    socket.send(
+      JSON.stringify({
+        type: 'TELEMETRY',
+        vehicleId,
+        data: vehicle.telemetry,
+      })
+    );
+  }
 
   /*
    * Handle messages coming from dashboard.
@@ -226,7 +252,7 @@ const handleServoCommand = (socket, command, value) => {
    * Servo angle must be a number
    * between 0 and 180 degrees.
    */
-  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 180) {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0 || value > 180) {
     sendError(socket, 'Servo value must be between 0 and 180');
 
     return;

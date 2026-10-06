@@ -45,6 +45,7 @@ venv/
 
 # ESP32 / Arduino
 .arduino/
+esp32/firmware/**/firmware_secrets.h
 
 # Local configuration
 *.local

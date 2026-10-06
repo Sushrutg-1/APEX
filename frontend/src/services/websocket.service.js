@@ -47,19 +47,48 @@ const connect = () => {
     return null;
   }
 
+  if (!env.WS_URL) {
+    notify({
+      type: 'WS_ERROR',
+      message: 'WebSocket URL is not configured',
+    });
+    return null;
+  }
+
   manuallyClosed = false;
 
   const url = `${env.WS_URL}?token=${encodeURIComponent(accessToken)}`;
 
-  socket = new WebSocket(url);
+  notify({
+    type: 'WS_CONNECTING',
+  });
 
-  socket.onopen = () => {
+  try {
+    socket = new WebSocket(url);
+  } catch (error) {
+    notify({
+      type: 'WS_ERROR',
+      message: 'Unable to initialize the WebSocket connection',
+    });
+    console.error('Unable to initialize the dashboard WebSocket:', error);
+    return null;
+  }
+  const activeSocket = socket;
+
+  activeSocket.onopen = () => {
+    if (socket !== activeSocket) {
+      return;
+    }
     notify({
       type: 'WS_OPEN',
     });
   };
 
-  socket.onmessage = (event) => {
+  activeSocket.onmessage = (event) => {
+    if (socket !== activeSocket) {
+      return;
+    }
+
     try {
       const data = JSON.parse(event.data);
 
@@ -72,21 +101,29 @@ const connect = () => {
     }
   };
 
-  socket.onerror = () => {
+  activeSocket.onerror = () => {
+    if (socket !== activeSocket) {
+      return;
+    }
+
     notify({
       type: 'WS_ERROR',
       message: 'WebSocket connection error',
     });
   };
 
-  socket.onclose = () => {
+  activeSocket.onclose = () => {
+    if (socket !== activeSocket) {
+      return;
+    }
+
     socket = null;
 
     notify({
       type: 'WS_CLOSE',
     });
 
-    if (!manuallyClosed) {
+    if (!manuallyClosed && listeners.size > 0) {
       clearTimeout(reconnectTimer);
 
       reconnectTimer = setTimeout(() => {
@@ -104,8 +141,12 @@ const disconnect = () => {
   clearTimeout(reconnectTimer);
 
   if (socket) {
+    const wasConnected = socket.readyState === WebSocket.OPEN;
     socket.close();
     socket = null;
+    if (wasConnected) {
+      notify({ type: 'WS_CLOSE' });
+    }
   }
 };
 

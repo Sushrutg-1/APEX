@@ -85,6 +85,16 @@
   background: #dc2626;
 }
 
+.home-status-connecting {
+  color: #475569;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+}
+
+.home-status-connecting .home-status-dot {
+  background: #94a3b8;
+}
+
 /* =========================================================
    ROVER STATUS CARD
    ========================================================= */
@@ -611,5 +621,388 @@
 
   .home-gps-value {
     margin-left: 0;
+  }
+}
+
+.home-geofence-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 22px;
+  margin: 0 0 20px;
+  padding: 18px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+}
+
+.home-geofence-card h2 {
+  margin: 4px 0;
+  color: #111827;
+  font-size: 15px;
+}
+
+.home-geofence-card p {
+  margin: 0;
+  color: #64748b;
+  font-size: 11px;
+}
+
+.home-geofence-card .home-geofence-warning {
+  color: #b91c1c;
+  font-weight: 700;
+}
+
+.home-weather-card {
+  margin: 0 0 20px;
+  padding: 18px;
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+  background: #ffffff;
+}
+
+.home-weather-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.home-weather-header h2 {
+  margin: 4px 0 0;
+  color: #111827;
+  font-size: 15px;
+}
+
+.home-weather-status {
+  padding: 5px 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 5px;
+  color: #64748b;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.home-weather-status.available {
+  border-color: #bbf7d0;
+  color: #15803d;
+}
+
+.home-weather-status.unavailable {
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
+.home-weather-location {
+  margin: 9px 0 14px;
+  color: #64748b;
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  font-size: 10px;
+}
+
+.home-weather-values {
+  display: grid;
+  grid-template-columns: 1.5fr repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.home-weather-values > div {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 11px 13px;
+  border: 1px solid #eef2f7;
+  border-radius: 7px;
+  background: #f8fafc;
+}
+
+.home-weather-values span {
+  color: #64748b;
+  font-size: 10px;
+}
+
+.home-weather-values strong {
+  color: #111827;
+  font-size: 13px;
+}
+
+.home-weather-primary strong {
+  font-size: 20px;
+}
+
+.home-weather-primary span {
+  color: #334155;
+  font-weight: 600;
+}
+
+.home-weather-message {
+  margin: 0;
+  color: #64748b;
+  font-size: 11px;
+}
+
+.home-geofence-card form {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.8fr) minmax(200px, 1.2fr) minmax(140px, 0.8fr) auto;
+  align-items: end;
+  gap: 10px;
+}
+
+.home-geofence-card form label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: #475569;
+  font-size: 10px;
+}
+
+.home-geofence-card form .home-geofence-toggle {
+  flex-direction: row;
+  align-items: center;
+  color: #334155;
+  font-weight: 600;
+}
+
+.home-geofence-map-hint {
+  margin: 0;
+  color: #64748b;
+  font-size: 11px;
+}
+
+.home-geofence-map {
+  height: 300px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.home-geofence-map .apex-map,
+.home-geofence-map .apex-map-container,
+.home-geofence-map .apex-map .leaflet-container {
+  height: 100%;
+  min-height: 260px;
+  border: 0;
+  border-radius: 0;
+}
+
+.home-geofence-coordinates {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: #64748b;
+  font-size: 10px;
+}
+
+.home-geofence-coordinates strong {
+  color: #334155;
+  font-family: monospace;
+  font-size: 11px;
+}
+
+.home-geofence-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.home-geofence-card form .home-geofence-remove {
+  border-color: #cbd5e1;
+  background: #ffffff;
+  color: #475569;
+}
+
+.home-geofence-card form input:not([type='checkbox']) {
+  width: 100%;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  color: #111827;
+  font: inherit;
+}
+
+.home-geofence-card form button,
+.control-snapshot-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 7px 10px;
+  border: 1px solid #2563eb;
+  border-radius: 6px;
+  background: #2563eb;
+  color: #ffffff;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.home-geofence-card form button:disabled,
+.control-snapshot-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.home-geofence-card form [role='status'] {
+  grid-column: 1 / -1;
+  color: #475569;
+  font-size: 11px;
+}
+
+.camera-feed-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 8px;
+  color: #64748b;
+  text-align: center;
+}
+
+.camera-feed-placeholder strong {
+  color: #cbd5e1;
+  font-size: 12px;
+}
+
+.camera-feed-placeholder span {
+  max-width: 300px;
+  color: #94a3b8;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.camera-feed-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.home-camera-view .camera-feed-image,
+.home-camera-view .camera-feed-placeholder {
+  width: 100%;
+  height: 100%;
+}
+
+.home-camera-view .camera-feed-container {
+  width: 100%;
+  height: 100%;
+}
+
+.apex-history-detection-status {
+  align-self: center;
+  color: #92400e;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.apex-history-error,
+.apex-history-message {
+  padding: 14px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.apex-history-error {
+  color: #b91c1c;
+}
+
+.apex-snapshot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.apex-snapshot-card {
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.apex-snapshot-card > img,
+.apex-snapshot-unavailable {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 160px;
+  object-fit: cover;
+  background: #0f172a;
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.apex-snapshot-details {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  color: #64748b;
+  font-size: 10px;
+}
+
+.apex-snapshot-details strong {
+  color: #111827;
+  font-size: 12px;
+}
+
+.apex-snapshot-detections {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.apex-event-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.apex-event-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 13px 0;
+  border-bottom: 1px solid #e2e8f0;
+  color: #64748b;
+  font-size: 10px;
+}
+
+.apex-event-list li > div {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.apex-event-list strong {
+  color: #111827;
+  font-size: 12px;
+}
+
+@media (max-width: 760px) {
+  .home-geofence-card form {
+    grid-template-columns: 1fr;
+  }
+
+  .home-weather-values {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 420px) {
+  .home-weather-values {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .home-weather-values > div {
+    padding: 10px;
   }
 }

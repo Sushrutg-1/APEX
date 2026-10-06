@@ -30,6 +30,40 @@ const vehicleSchema = new mongoose.Schema(
       enum: ['online', 'offline'],
       default: 'offline',
     },
+
+    telemetry: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
+
+    lastTelemetryAt: {
+      type: Date,
+      default: null,
+    },
+
+    geofence: {
+      enabled: {
+        type: Boolean,
+        default: false,
+      },
+      latitude: {
+        type: Number,
+        default: null,
+      },
+      longitude: {
+        type: Number,
+        default: null,
+      },
+      radiusMeters: {
+        type: Number,
+        default: null,
+      },
+      state: {
+        type: String,
+        enum: ['UNKNOWN', 'INSIDE', 'OUTSIDE'],
+        default: 'UNKNOWN',
+      },
+    },
   },
   {
     timestamps: true,

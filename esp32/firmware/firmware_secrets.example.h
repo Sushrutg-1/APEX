@@ -1,0 +1,4 @@
+#define APEX_WIFI_SSID ""
+#define APEX_WIFI_PASSWORD ""
+#define APEX_BACKEND_HOST ""
+#define APEX_DEVICE_TOKEN ""
