@@ -1089,6 +1089,165 @@ a {
   background: var(--apex-danger);
 }
 
+.hero-image-wrapper {
+  display: grid;
+  place-items: center;
+  padding: clamp(24px, 5vw, 64px);
+  background:
+    radial-gradient(ellipse at 50% 42%, rgba(59, 130, 246, 0.24), transparent 58%),
+    linear-gradient(145deg, #101d33, #070b12);
+}
+
+.hero-product-overview {
+  width: min(100%, 490px);
+  padding: 26px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  background: rgba(15, 23, 36, 0.88);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
+  color: #f8fafc;
+}
+
+.hero-product-overview > span,
+.product-preview-header span {
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hero-product-overview img {
+  width: min(100%, 330px);
+  height: 220px;
+  display: block;
+  margin: 20px auto;
+  object-fit: contain;
+}
+
+.hero-product-overview h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 23px;
+}
+
+.hero-product-overview p,
+.product-preview > p {
+  margin: 9px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.hero-product-overview p {
+  color: #94a3b8;
+}
+
+.product-preview {
+  padding: 24px;
+  color: var(--apex-text);
+}
+
+.product-preview-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--apex-border);
+}
+
+.product-preview-header strong {
+  font-family: var(--font-display);
+  font-size: 18px;
+}
+
+.product-preview-header span {
+  color: var(--apex-text-secondary);
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.product-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.product-preview-capability {
+  min-height: 116px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--apex-border);
+  border-radius: 8px;
+  background: #f8fafc;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.product-preview-capability img {
+  width: 66px;
+  height: 66px;
+  flex: 0 0 66px;
+  object-fit: contain;
+}
+
+.product-preview > p {
+  color: var(--apex-text-secondary);
+}
+
+@media (max-width: 700px) {
+  .navbar-links.is-open {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    left: 0;
+    display: flex;
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0;
+    padding: 8px;
+    border: 1px solid var(--apex-border);
+    border-radius: var(--radius-lg);
+    background: var(--apex-white);
+    box-shadow: var(--shadow-md);
+  }
+
+  .navbar-links.is-open > * {
+    padding: 12px;
+  }
+
+  .navbar-links.is-open .navbar-signup {
+    text-align: center;
+  }
+
+  .hero-image-wrapper {
+    min-height: 380px;
+    padding: 18px;
+  }
+
+  .hero-product-overview {
+    padding: 19px;
+  }
+
+  .hero-product-overview img {
+    height: 175px;
+  }
+
+  .product-preview {
+    padding: 16px;
+  }
+
+  .product-preview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .product-preview-capability {
+    min-height: 88px;
+  }
+}
+
 /* =========================================================
    RESPONSIVE — TABLET
 ========================================================= */

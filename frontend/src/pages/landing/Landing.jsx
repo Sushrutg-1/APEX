@@ -17,7 +17,7 @@ const features = [
   {
     image: '/illustrations/features/feature-gps-tracking.svg',
     title: 'GPS Tracking',
-    description: 'Track the rover location and movement with live GPS information and route data.',
+    description: "View the rover's GPS position and configured geofence on the dashboard map.",
   },
   {
     image: '/illustrations/features/feature-live-camera.svg',
@@ -27,12 +27,12 @@ const features = [
   {
     image: '/illustrations/features/feature-event-detection.svg',
     title: 'Event Detection',
-    description: 'Detect important events and provide useful information for faster response.',
+    description: 'Review recorded flame, obstacle and geofence alerts from the rover.',
   },
   {
     image: '/illustrations/features/feature-snapshot-history.svg',
     title: 'Snapshot History',
-    description: 'Save important camera captures and review previous events whenever required.',
+    description: 'Save rover camera snapshots and review saved images and vehicle events.',
   },
 ];
 
@@ -61,8 +61,8 @@ function Landing() {
             </h1>
 
             <p>
-              APEX brings live rover monitoring, remote control, GPS tracking, camera streaming and
-              event management together in one platform.
+              APEX brings rover telemetry, remote control, GPS tracking, camera access and event
+              history together in one platform.
             </p>
 
             <div className="hero-actions">
@@ -96,34 +96,17 @@ function Landing() {
 
           <div className="hero-visual">
             <div className="hero-image-wrapper">
-              <img src="/images/hero/hero-rover-field.jpg" alt="APEX monitoring rover" />
-
-              <div className="hero-image-overlay" />
-
-              <div className="hero-status-card">
-                <div className="status-card-header">
-                  <span className="status-live-dot" />
-                  Rover Online
-                </div>
-
-                <strong>APEX Rover 01</strong>
-
-                <div className="status-card-data">
-                  <div>
-                    <span>Speed</span>
-                    <strong>1.4 m/s</strong>
-                  </div>
-
-                  <div>
-                    <span>Battery</span>
-                    <strong>82%</strong>
-                  </div>
-                </div>
-              </div>
-
-              <div className="hero-live-label">
-                <span />
-                LIVE MONITORING
+              <div className="hero-product-overview">
+                <span>APEX platform</span>
+                <img
+                  src="/illustrations/features/feature-live-monitoring.svg"
+                  alt=""
+                />
+                <h2>Rover operations, together.</h2>
+                <p>
+                  Product illustration. Live readings are available in the dashboard when a rover
+                  is connected.
+                </p>
               </div>
             </div>
           </div>
@@ -144,9 +127,8 @@ function Landing() {
           </div>
 
           <p>
-            From live camera monitoring and GPS tracking to remote vehicle control and event
-            history, APEX provides the tools required to operate and monitor your rover from a
-            single interface.
+            From rover telemetry and GPS tracking to remote vehicle control, camera access and
+            recorded events, APEX brings connected rover operations into one interface.
           </p>
         </section>
 
@@ -176,10 +158,6 @@ function Landing() {
 
                   <p>{feature.description}</p>
 
-                  <span className="feature-link">
-                    Learn more
-                    <ArrowRight size={15} />
-                  </span>
                 </div>
               </article>
             ))}
@@ -211,7 +189,22 @@ function Landing() {
           </div>
 
           <div className="product-preview">
-            <img src="/images/monitoring/dashboard-mockup.png" alt="APEX command center" />
+            <div className="product-preview-header">
+              <strong>APEX platform</strong>
+              <span>Connected rover capabilities</span>
+            </div>
+            <div className="product-preview-grid">
+              {features.slice(0, 4).map((feature) => (
+                <div className="product-preview-capability" key={feature.title}>
+                  <img src={feature.image} alt="" />
+                  <span>{feature.title}</span>
+                </div>
+              ))}
+            </div>
+            <p>
+              Illustrative overview. Live readings are shown in the dashboard when a rover is
+              connected.
+            </p>
           </div>
         </section>
 

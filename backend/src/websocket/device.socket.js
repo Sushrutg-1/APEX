@@ -1,4 +1,5 @@
 import Vehicle from '../models/Vehicle.model.js';
+import Event from '../models/Event.model.js';
 
 import {
   setDeviceSocket,
@@ -7,14 +8,17 @@ import {
   getControllerSocket,
 } from './websocket.manager.js';
 
-import API_MESSAGE from '../constants/apiMessage.constant.js';
-
 const TELEMETRY_TIMEOUT_MS = 15000;
+const SENSOR_STATE_LIMIT = 100;
+const SENSOR_STATE_MAX_AGE_MS = 5 * 60 * 1000;
 
 /*
  * Store telemetry timeout for each vehicle.
  */
 const telemetryTimers = new Map();
+const sensorEventStates = new Map();
+const telemetryQueues = new Map();
+let lastSensorStatePruneAt = 0;
 
 /*
  * Clear existing telemetry timeout.
@@ -87,6 +91,7 @@ const startTelemetryTimer = (vehicleId, socket) => {
  */
 const handleDeviceSocket = (socket) => {
   const { vehicleId, name } = socket.device;
+  const previousSocket = getDeviceSocket(vehicleId);
 
   console.log(`[DEVICE CONNECT] ${name} (${vehicleId}) connected`);
 
@@ -94,6 +99,9 @@ const handleDeviceSocket = (socket) => {
    * Register the ESP32 socket.
    */
   setDeviceSocket(vehicleId, socket);
+  if (previousSocket && previousSocket !== socket && previousSocket.readyState === 1) {
+    previousSocket.close(1000, 'Replaced by a newer device connection');
+  }
 
   /*
    * Clear any previous timeout.
@@ -123,17 +131,35 @@ const handleDeviceSocket = (socket) => {
   /*
    * Handle messages received from ESP32.
    */
-  socket.on('message', (message) => {
-    try {
-      const data = JSON.parse(message.toString());
+  socket.on('message', async (message) => {
+    if (getDeviceSocket(vehicleId) !== socket) {
+      return;
+    }
 
-      handleDeviceMessage(socket, data);
+    let data;
+
+    try {
+      data = JSON.parse(message.toString());
     } catch (error) {
       console.error(`[DEVICE MESSAGE ERROR] ${vehicleId}:`, error);
 
       sendMessage(socket, {
         type: 'ERROR',
+        code: 'INVALID_MESSAGE',
         message: 'Invalid message format',
+      });
+      return;
+    }
+
+    try {
+      await handleDeviceMessage(socket, data);
+    } catch (error) {
+      console.error(`[DEVICE MESSAGE PROCESSING ERROR] ${vehicleId}:`, error);
+
+      sendMessage(socket, {
+        type: 'ERROR',
+        code: 'DEVICE_MESSAGE_FAILED',
+        message: 'Device message could not be processed',
       });
     }
   });
@@ -144,8 +170,6 @@ const handleDeviceSocket = (socket) => {
   socket.on('close', async () => {
     console.log(`[DEVICE DISCONNECT] ${name} (${vehicleId}) disconnected`);
 
-    clearTelemetryTimer(vehicleId);
-
     /*
      * Only remove the socket if this is still
      * the active device connection.
@@ -155,6 +179,8 @@ const handleDeviceSocket = (socket) => {
     if (activeSocket !== socket) {
       return;
     }
+
+    clearTelemetryTimer(vehicleId);
 
     const removed = removeDeviceSocket(vehicleId, socket);
 
@@ -191,7 +217,7 @@ const handleDeviceSocket = (socket) => {
 /*
  * Handle all messages received from ESP32.
  */
-const handleDeviceMessage = (socket, data) => {
+const handleDeviceMessage = async (socket, data) => {
   if (!data || typeof data !== 'object') {
     sendMessage(socket, {
       type: 'ERROR',
@@ -206,7 +232,7 @@ const handleDeviceMessage = (socket, data) => {
      * ESP32 telemetry.
      */
     case 'TELEMETRY':
-      handleTelemetry(socket, data);
+      await handleTelemetry(socket, data);
       break;
 
     /*
@@ -243,14 +269,48 @@ const handleDeviceMessage = (socket, data) => {
 /*
  * Handle telemetry received from ESP32.
  */
-const handleTelemetry = (socket, data) => {
+const handleTelemetry = async (socket, data) => {
   const { vehicleId } = socket.device;
+  const previous = telemetryQueues.get(vehicleId) || Promise.resolve();
+  const processing = previous
+    .catch(() => {})
+    .then(() => processTelemetry(socket, data));
+  telemetryQueues.set(vehicleId, processing);
+
+  try {
+    await processing;
+  } finally {
+    if (telemetryQueues.get(vehicleId) === processing) {
+      telemetryQueues.delete(vehicleId);
+    }
+  }
+};
+
+const processTelemetry = async (socket, data) => {
+  const { vehicleId } = socket.device;
+  const telemetry = sanitizeTelemetry(data.data ?? data, vehicleId);
 
   console.log('================================');
   console.log('TELEMETRY FROM ESP32');
   console.log('Vehicle:', vehicleId);
-  console.log(JSON.stringify(data.data ?? data, null, 2));
+  console.log(JSON.stringify(telemetry, null, 2));
   console.log('================================');
+
+  const vehicle = await Vehicle.findOneAndUpdate(
+    { vehicleId },
+    {
+      $set: {
+        status: 'online',
+        telemetry,
+        lastTelemetryAt: new Date(),
+      },
+    },
+    { returnDocument: 'after' }
+  );
+
+  if (!vehicle) {
+    throw new Error(`Vehicle ${vehicleId} no longer exists`);
+  }
 
   /*
    * Telemetry received successfully.
@@ -258,11 +318,13 @@ const handleTelemetry = (socket, data) => {
    */
   startTelemetryTimer(vehicleId, socket);
 
+  const controllerSocket = getControllerSocket(vehicleId);
+  await processGeofence(vehicle, telemetry, controllerSocket);
+  await processSensorEvents(vehicle, telemetry, controllerSocket);
+
   /*
    * Forward REAL telemetry to dashboard.
    */
-  const controllerSocket = getControllerSocket(vehicleId);
-
   if (!controllerSocket || controllerSocket.readyState !== 1) {
     return;
   }
@@ -270,8 +332,221 @@ const handleTelemetry = (socket, data) => {
   sendMessage(controllerSocket, {
     type: 'TELEMETRY',
     vehicleId,
-    data: data.data ?? data,
+    data: telemetry,
   });
+};
+
+const processSensorEvents = async (vehicle, telemetry, controllerSocket) => {
+  const now = Date.now();
+
+  if (
+    sensorEventStates.size >= SENSOR_STATE_LIMIT &&
+    now - lastSensorStatePruneAt >= 60000
+  ) {
+    lastSensorStatePruneAt = now;
+    for (const [vehicleId, state] of sensorEventStates) {
+      if (now - state.updatedAt > SENSOR_STATE_MAX_AGE_MS) {
+        sensorEventStates.delete(vehicleId);
+      }
+    }
+  }
+
+  const state = sensorEventStates.get(vehicle.vehicleId) || { updatedAt: now };
+  const sensors = [
+    {
+      field: 'flame',
+      type: 'FIRE_DETECTED',
+      message: 'Fire detected by the rover',
+    },
+    {
+      field: 'obstacle',
+      type: 'OBSTACLE_DETECTED',
+      message: 'Obstacle detected by the rover',
+    },
+  ];
+
+  for (const sensor of sensors) {
+    const detected = telemetry[sensor.field];
+    if (typeof detected !== 'boolean') {
+      continue;
+    }
+
+    if (state[sensor.field] === false && detected) {
+      const hasLocation =
+        telemetry.gpsFix === true &&
+        Number.isFinite(telemetry.latitude) &&
+        Number.isFinite(telemetry.longitude);
+      const event = await Event.create({
+        vehicle: vehicle._id,
+        vehicleId: vehicle.vehicleId,
+        type: sensor.type,
+        message: sensor.message,
+        latitude: hasLocation ? telemetry.latitude : null,
+        longitude: hasLocation ? telemetry.longitude : null,
+        details:
+          sensor.field === 'obstacle' && Number.isFinite(telemetry.distance)
+            ? { distanceCm: telemetry.distance }
+            : null,
+      });
+
+      if (controllerSocket?.readyState === 1) {
+        sendMessage(controllerSocket, {
+          type: 'VEHICLE_EVENT',
+          event: event.toObject(),
+        });
+      }
+    }
+
+    state[sensor.field] = detected;
+  }
+
+  state.updatedAt = now;
+  sensorEventStates.set(vehicle.vehicleId, state);
+};
+
+const sanitizeTelemetry = (data, vehicleId) => {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    throw new Error('Telemetry data must be an object');
+  }
+
+  const numericFields = [
+    'speed',
+    'distance',
+    'latitude',
+    'longitude',
+    'altitude',
+    'gpsSpeed',
+    'satellites',
+    'pan',
+    'tilt',
+    'wifiRSSI',
+    'uptime',
+    'freeHeap',
+    'chipFreq',
+  ];
+  const booleanFields = ['gpsFix', 'flame', 'obstacle', 'alarm'];
+  const telemetry = { vehicleId };
+
+  for (const field of numericFields) {
+    if (data[field] === null) {
+      telemetry[field] = null;
+    } else if (typeof data[field] === 'number' && Number.isFinite(data[field])) {
+      telemetry[field] = data[field];
+    }
+  }
+
+  for (const field of booleanFields) {
+    if (typeof data[field] === 'boolean') {
+      telemetry[field] = data[field];
+    }
+  }
+
+  for (const field of ['ip', 'roverState']) {
+    if (typeof data[field] === 'string') {
+      telemetry[field] = data[field].slice(0, 64);
+    }
+  }
+
+  const validCoordinates =
+    Number.isFinite(telemetry.latitude) &&
+    telemetry.latitude >= -90 &&
+    telemetry.latitude <= 90 &&
+    Number.isFinite(telemetry.longitude) &&
+    telemetry.longitude >= -180 &&
+    telemetry.longitude <= 180;
+
+  if (telemetry.gpsFix !== true || !validCoordinates) {
+    telemetry.gpsFix = false;
+    telemetry.latitude = null;
+    telemetry.longitude = null;
+    telemetry.altitude = null;
+  }
+
+  return telemetry;
+};
+
+const processGeofence = async (vehicle, telemetry, controllerSocket) => {
+  const { geofence } = vehicle;
+
+  if (
+    !geofence?.enabled ||
+    !Number.isFinite(geofence.latitude) ||
+    !Number.isFinite(geofence.longitude) ||
+    !Number.isFinite(geofence.radiusMeters) ||
+    geofence.radiusMeters <= 0 ||
+    telemetry.gpsFix !== true ||
+    !Number.isFinite(telemetry.latitude) ||
+    !Number.isFinite(telemetry.longitude)
+  ) {
+    return;
+  }
+
+  const distance = distanceBetweenMeters(
+    telemetry.latitude,
+    telemetry.longitude,
+    geofence.latitude,
+    geofence.longitude
+  );
+  const nextState = distance <= geofence.radiusMeters ? 'INSIDE' : 'OUTSIDE';
+  const previousState = geofence.state || 'UNKNOWN';
+
+  if (nextState === previousState) {
+    return;
+  }
+
+  geofence.state = nextState;
+  await vehicle.save();
+
+  if (controllerSocket?.readyState === 1) {
+    sendMessage(controllerSocket, {
+      type: 'GEOFENCE_STATUS',
+      vehicleId: vehicle.vehicleId,
+      geofence: vehicle.geofence,
+    });
+  }
+
+  if (previousState !== 'INSIDE' || nextState !== 'OUTSIDE') {
+    return;
+  }
+
+  const event = await Event.create({
+    vehicle: vehicle._id,
+    vehicleId: vehicle.vehicleId,
+    type: 'GEOFENCE_VIOLATION',
+    message: 'Vehicle exited its configured geofence',
+    latitude: telemetry.latitude,
+    longitude: telemetry.longitude,
+    details: {
+      distanceMeters: Math.round(distance),
+      radiusMeters: geofence.radiusMeters,
+    },
+  });
+
+  if (controllerSocket?.readyState === 1) {
+    sendMessage(controllerSocket, {
+      type: 'GEOFENCE_EVENT',
+      event: event.toObject(),
+    });
+  }
+};
+
+const distanceBetweenMeters = (latitude1, longitude1, latitude2, longitude2) => {
+  const radians = (degrees) => (degrees * Math.PI) / 180;
+  const latitudeDelta = radians(latitude2 - latitude1);
+  const longitudeDelta = radians(longitude2 - longitude1);
+  const haversine =
+    Math.sin(latitudeDelta / 2) ** 2 +
+    Math.cos(radians(latitude1)) *
+      Math.cos(radians(latitude2)) *
+      Math.sin(longitudeDelta / 2) ** 2;
+
+  const boundedHaversine = Math.min(1, Math.max(0, haversine));
+
+  return (
+    6371000 *
+    2 *
+    Math.atan2(Math.sqrt(boundedHaversine), Math.sqrt(1 - boundedHaversine))
+  );
 };
 
 /*

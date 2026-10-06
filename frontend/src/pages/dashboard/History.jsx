@@ -1,416 +1,188 @@
-import { useEffect } from 'react';
-import {
-  Activity,
-  AlertTriangle,
-  Camera,
-  Gauge,
-  MapPin,
-  Radio,
-  Satellite,
-  Signal,
-  Wifi,
-  WifiOff,
-} from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
-import {
-  updateTelemetry,
-  vehicleOnline,
-  vehicleOffline,
-  websocketConnected,
-  websocketDisconnected,
-} from '../../redux/slices/vehicleSlice';
-
-import websocketService from '../../services/websocket.service';
-
+import api from '../../services/api.service';
+import { eventsLoaded } from '../../redux/slices/vehicleSlice';
 import './Home.css';
 
-function Home() {
+function History() {
   const dispatch = useDispatch();
-
-  const { user, vehicle } = useSelector((state) => state.auth);
-
-  const {
-    status,
-    telemetry,
-    websocketConnected: isWebsocketConnected,
-  } = useSelector((state) => state.vehicle);
-
-  const isOnline = status === 'online';
-
-  const vehicleId = vehicle?.vehicleId || 'Unavailable';
-  const vehicleName = vehicle?.name || 'Unavailable';
-
-  const username = user?.username || 'Unavailable';
-
-  const data = isOnline ? telemetry : null;
+  const vehicle = useSelector((state) => state.auth.vehicle);
+  const events = useSelector((state) => state.vehicle.events);
+  const [snapshots, setSnapshots] = useState([]);
+  const [snapshotImages, setSnapshotImages] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    websocketService.connect();
+    let active = true;
 
-    const unsubscribe = websocketService.subscribe((message) => {
-      if (!message) {
-        return;
-      }
-
-      if (message.type === 'WS_OPEN') {
-        dispatch(websocketConnected());
-        return;
-      }
-
-      if (message.type === 'WS_CLOSE') {
-        dispatch(websocketDisconnected());
-        return;
-      }
-
-      if (message.type === 'DEVICE_STATUS') {
-        if (message.status === 'online') {
-          dispatch(vehicleOnline());
+    api
+      .get('/vehicles/me/history')
+      .then(({ data }) => {
+        if (!active) {
+          return;
         }
-
-        if (message.status === 'offline') {
-          dispatch(vehicleOffline());
+        dispatch(eventsLoaded(data.data.events || []));
+        setSnapshots(data.data.snapshots || []);
+      })
+      .catch((requestError) => {
+        if (active) {
+          setError(requestError.response?.data?.message || 'Unable to load vehicle history');
         }
+      })
+      .finally(() => {
+        if (active) {
+          setLoading(false);
+        }
+      });
 
-        return;
-      }
+    return () => {
+      active = false;
+    };
+  }, [dispatch]);
 
-      if (message.type === 'TELEMETRY') {
-        dispatch(updateTelemetry(message.data ?? null));
+  useEffect(() => {
+    let active = true;
+    const objectUrls = [];
+
+    Promise.all(
+      snapshots.map(async (snapshot) => {
+        try {
+          const { data } = await api.get(
+            `/vehicles/me/snapshots/${snapshot._id}/image`,
+            { responseType: 'blob' }
+          );
+          const url = URL.createObjectURL(data);
+          if (!active) {
+            URL.revokeObjectURL(url);
+            return [snapshot._id, null];
+          }
+          objectUrls.push(url);
+          return [snapshot._id, url];
+        } catch {
+          return [snapshot._id, null];
+        }
+      })
+    ).then((entries) => {
+      if (active) {
+        setSnapshotImages(Object.fromEntries(entries));
       }
     });
 
     return () => {
-      unsubscribe();
+      active = false;
+      objectUrls.forEach((url) => URL.revokeObjectURL(url));
     };
-  }, [dispatch]);
+  }, [snapshots]);
 
-  const formatValue = (value, suffix = '') => {
-    if (value === null || value === undefined) {
-      return 'Unavailable';
-    }
-
-    return `${value}${suffix}`;
-  };
-
-  const formatUptime = (seconds) => {
-    if (seconds === null || seconds === undefined || typeof seconds !== 'number') {
-      return 'Unavailable';
-    }
-
-    const total = Math.floor(seconds);
-
-    const days = Math.floor(total / 86400);
-    const hours = Math.floor((total % 86400) / 3600);
-    const minutes = Math.floor((total % 3600) / 60);
-    const secs = total % 60;
-
-    if (days > 0) {
-      return `${days}d ${hours}h ${minutes}m`;
-    }
-
-    if (hours > 0) {
-      return `${hours}h ${minutes}m`;
-    }
-
-    if (minutes > 0) {
-      return `${minutes}m ${secs}s`;
-    }
-
-    return `${secs}s`;
-  };
-
-  const gpsAvailable =
-    data?.gpsFix === true &&
-    data?.latitude !== null &&
-    data?.latitude !== undefined &&
-    data?.longitude !== null &&
-    data?.longitude !== undefined;
-
-  const gpsCoordinates = gpsAvailable
-    ? `${Number(data.latitude).toFixed(6)}, ${Number(data.longitude).toFixed(6)}`
-    : 'Unavailable';
+  const eventHistory = events.filter((event) => event.type !== 'SNAPSHOT');
 
   return (
-    <main className="apex-home">
-      {/* =====================================================
-          PAGE HEADER
-          ===================================================== */}
-
-      <section className="apex-home-header">
+    <main className="dashboard-page apex-history">
+      <section className="home-header">
         <div>
-          <span className="apex-home-eyebrow">APEX CONTROL CENTER</span>
-
-          <h1>Rover Overview</h1>
-
-          <p>Monitor the current status and telemetry of your rover.</p>
-        </div>
-
-        <div className={`apex-home-status ${isOnline ? 'online' : 'offline'}`}>
-          <span />
-
-          {isOnline ? 'Online' : 'Offline'}
+          <span className="page-eyebrow">VEHICLE RECORDS</span>
+          <h1>History</h1>
+          <p>{vehicle?.name || vehicle?.vehicleId || 'Vehicle'} snapshots and events.</p>
         </div>
       </section>
 
-      {/* =====================================================
-          VEHICLE STATUS
-          ===================================================== */}
+      {error && <p className="apex-history-error" role="alert">{error}</p>}
 
-      <section className="apex-home-status-card">
-        <div className="apex-home-status-main">
-          <div className={`apex-home-status-icon ${isOnline ? 'online' : 'offline'}`}>
-            {isOnline ? <Wifi size={22} /> : <WifiOff size={22} />}
-          </div>
-
+      <section className="home-section">
+        <div className="home-section-header">
           <div>
-            <span className="apex-home-card-label">ROVER STATUS</span>
-
-            <h2>{isOnline ? 'Rover Online' : 'Rover Offline'}</h2>
-
-            <p>
-              {isOnline
-                ? 'The rover is connected and sending live telemetry.'
-                : 'The rover is disconnected. Live telemetry is unavailable.'}
-            </p>
+            <span className="home-section-eyebrow">CAMERA RECORDS</span>
+            <h2>Snapshots</h2>
           </div>
         </div>
 
-        <div className="apex-home-status-info">
+        {loading ? (
+          <p className="apex-history-message">Loading snapshots...</p>
+        ) : snapshots.length === 0 ? (
+          <p className="apex-history-message">No snapshots have been saved.</p>
+        ) : (
+          <div className="apex-snapshot-grid">
+            {snapshots.map((snapshot) => (
+              <article className="apex-snapshot-card" key={snapshot._id}>
+                {snapshotImages[snapshot._id] ? (
+                  <img src={snapshotImages[snapshot._id]} alt={`Snapshot from ${snapshot.vehicleId}`} />
+                ) : (
+                  <div className="apex-snapshot-unavailable">Snapshot image unavailable</div>
+                )}
+                <div className="apex-snapshot-details">
+                  <strong>{snapshot.vehicleId}</strong>
+                  <time dateTime={snapshot.createdAt}>
+                    {new Date(snapshot.createdAt).toLocaleString()}
+                  </time>
+                  <span>
+                    {Number.isFinite(snapshot.latitude) && Number.isFinite(snapshot.longitude)
+                      ? `${snapshot.latitude.toFixed(6)}, ${snapshot.longitude.toFixed(6)}`
+                      : 'Location unavailable'}
+                  </span>
+                  {snapshot.detectionStatus === 'AVAILABLE' ? (
+                    snapshot.detectedObjects?.length ? (
+                      <ul className="apex-snapshot-detections">
+                        {snapshot.detectedObjects.map((object, index) => (
+                          <li key={`${object.className || object.name || object.class || 'object'}-${index}`}>
+                            {(object.className || object.name || object.class || 'Object')
+                              .replaceAll('_', ' ')
+                              .replace(/\b\w/g, (letter) => letter.toUpperCase())}
+                            {Number.isFinite(object.confidence)
+                              ? ` — ${Math.round(object.confidence * 100)}%`
+                              : ''}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <span>No objects detected</span>
+                    )
+                  ) : (
+                    <span>Detection unavailable</span>
+                  )}
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="home-section">
+        <div className="home-section-header">
           <div>
-            <span>Vehicle ID</span>
-            <strong>{vehicleId}</strong>
-          </div>
-
-          <div>
-            <span>Vehicle</span>
-            <strong>{vehicleName}</strong>
-          </div>
-
-          <div>
-            <span>Dashboard</span>
-            <strong>{isWebsocketConnected ? 'Connected' : 'Disconnected'}</strong>
-          </div>
-        </div>
-      </section>
-
-      {/* =====================================================
-          TELEMETRY
-          ===================================================== */}
-
-      <section className="apex-home-section">
-        <div className="apex-home-section-heading">
-          <span>LIVE TELEMETRY</span>
-          <h2>Vehicle Data</h2>
-        </div>
-
-        <div className="apex-home-telemetry-grid">
-          <TelemetryCard
-            icon={<Gauge size={20} />}
-            label="GPS Speed"
-            value={formatValue(data?.gpsSpeed, ' km/h')}
-          />
-
-          <TelemetryCard
-            icon={<Signal size={20} />}
-            label="Wi-Fi Signal"
-            value={formatValue(data?.wifiRSSI, ' dBm')}
-          />
-
-          <TelemetryCard
-            icon={<Activity size={20} />}
-            label="Rover State"
-            value={data?.roverState || 'Unavailable'}
-          />
-
-          <TelemetryCard icon={<MapPin size={20} />} label="GPS Location" value={gpsCoordinates} />
-        </div>
-      </section>
-
-      {/* =====================================================
-          CAMERA + SYSTEM
-          ===================================================== */}
-
-      <section className="apex-home-main-grid">
-        <div className="apex-home-panel">
-          <div className="apex-home-panel-header">
-            <div>
-              <span>CAMERA</span>
-              <h2>Live Camera</h2>
-            </div>
-
-            <span className={`apex-camera-status ${isOnline ? 'unavailable' : 'offline'}`}>
-              <span />
-
-              {isOnline ? 'Stream unavailable' : 'Rover offline'}
-            </span>
-          </div>
-
-          <div className="apex-camera-view">
-            <div className="apex-camera-empty">
-              <div className="apex-camera-icon">
-                <Camera size={30} />
-              </div>
-
-              <h3>{isOnline ? 'Camera stream unavailable' : 'Rover offline'}</h3>
-
-              <p>
-                {isOnline
-                  ? 'ESP32-CAM streaming is not connected yet.'
-                  : 'Connect the rover to access the camera stream.'}
-              </p>
-            </div>
+            <span className="home-section-eyebrow">VEHICLE EVENTS</span>
+            <h2>Events</h2>
           </div>
         </div>
 
-        <div className="apex-home-panel">
-          <div className="apex-home-panel-header">
-            <div>
-              <span>SYSTEM</span>
-              <h2>System Information</h2>
-            </div>
-          </div>
-
-          <div className="apex-system-list">
-            <SystemRow label="IP Address" value={data?.ip || 'Unavailable'} />
-
-            <SystemRow label="Uptime" value={formatUptime(data?.uptime)} />
-
-            <SystemRow label="Free Memory" value={formatValue(data?.freeHeap, ' bytes')} />
-
-            <SystemRow label="CPU Frequency" value={formatValue(data?.chipFreq, ' MHz')} />
-
-            <SystemRow
-              label="Alarm"
-              value={data ? (data.alarm ? 'Active' : 'Inactive') : 'Unavailable'}
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* =====================================================
-          SENSOR DATA
-          ===================================================== */}
-
-      <section className="apex-home-section">
-        <div className="apex-home-section-heading">
-          <span>SENSORS</span>
-          <h2>Rover Sensors</h2>
-        </div>
-
-        <div className="apex-home-sensor-grid">
-          <SensorCard
-            icon={<Radio size={19} />}
-            label="Distance"
-            value={
-              data?.distance !== null && data?.distance !== undefined && data.distance >= 0
-                ? `${data.distance} cm`
-                : 'Unavailable'
-            }
-          />
-
-          <SensorCard
-            icon={<AlertTriangle size={19} />}
-            label="Obstacle"
-            value={data ? (data.obstacle ? 'Detected' : 'Clear') : 'Unavailable'}
-          />
-
-          <SensorCard
-            icon={<AlertTriangle size={19} />}
-            label="Flame"
-            value={data ? (data.flame ? 'Detected' : 'Clear') : 'Unavailable'}
-          />
-
-          <SensorCard
-            icon={<Satellite size={19} />}
-            label="GPS Satellites"
-            value={
-              data?.satellites !== null && data?.satellites !== undefined
-                ? data.satellites
-                : 'Unavailable'
-            }
-          />
-
-          <SensorCard
-            icon={<Camera size={19} />}
-            label="Camera Pan"
-            value={formatValue(data?.pan, '°')}
-          />
-
-          <SensorCard
-            icon={<Camera size={19} />}
-            label="Camera Tilt"
-            value={formatValue(data?.tilt, '°')}
-          />
-        </div>
-      </section>
-
-      {/* =====================================================
-          GPS
-          ===================================================== */}
-
-      <section className="apex-home-gps">
-        <div className="apex-home-gps-icon">
-          <MapPin size={22} />
-        </div>
-
-        <div className="apex-home-gps-content">
-          <span>GPS STATUS</span>
-
-          <h2>{gpsAvailable ? 'GPS Fix Available' : 'GPS Unavailable'}</h2>
-
-          <p>
-            {gpsAvailable
-              ? `${data.satellites ?? 0} satellites connected`
-              : isOnline
-                ? 'No GPS fix is currently available.'
-                : 'Rover is offline. GPS data is unavailable.'}
-          </p>
-        </div>
-
-        <strong>{gpsCoordinates}</strong>
+        {loading ? (
+          <p className="apex-history-message">Loading events...</p>
+        ) : eventHistory.length === 0 ? (
+          <p className="apex-history-message">No vehicle events have been recorded.</p>
+        ) : (
+          <ol className="apex-event-list">
+            {eventHistory.map((event) => (
+              <li key={event._id}>
+                <div>
+                  <strong>{event.message}</strong>
+                  <span>{event.vehicleId} · {event.type}</span>
+                  <time dateTime={event.createdAt}>
+                    {new Date(event.createdAt).toLocaleString()}
+                  </time>
+                </div>
+                <span>
+                  {Number.isFinite(event.latitude) && Number.isFinite(event.longitude)
+                    ? `${event.latitude.toFixed(6)}, ${event.longitude.toFixed(6)}`
+                    : 'Location unavailable'}
+                </span>
+              </li>
+            ))}
+          </ol>
+        )}
       </section>
     </main>
   );
 }
 
-/* =========================================================
-   SMALL COMPONENTS
-   ========================================================= */
-
-function TelemetryCard({ icon, label, value }) {
-  return (
-    <div className="apex-telemetry-card">
-      <div className="apex-telemetry-icon">{icon}</div>
-
-      <div>
-        <span>{label}</span>
-        <strong>{value}</strong>
-      </div>
-    </div>
-  );
-}
-
-function SensorCard({ icon, label, value }) {
-  return (
-    <div className="apex-sensor-card">
-      <div className="apex-sensor-icon">{icon}</div>
-
-      <div>
-        <span>{label}</span>
-        <strong>{value}</strong>
-      </div>
-    </div>
-  );
-}
-
-function SystemRow({ label, value }) {
-  return (
-    <div className="apex-system-row">
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  );
-}
-
-export default Home;
+export default History;

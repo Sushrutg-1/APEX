@@ -1,9 +1,9 @@
 .control-page {
   width: 100%;
-  height: calc(100vh - 74px);
+  min-height: calc(100vh - 74px);
   max-width: 1600px;
   margin: 0 auto;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .control-header {
@@ -86,8 +86,8 @@
   display: grid;
   grid-template-columns: minmax(0, 1.35fr) minmax(380px, 0.9fr);
   gap: 16px;
-  height: 42%;
-  min-height: 300px;
+  height: 480px;
+  min-height: 480px;
 }
 
 .control-live-card {
@@ -100,10 +100,11 @@
 }
 
 .control-live-card-header {
-  height: 52px;
+  min-height: 52px;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 10px;
   padding: 0 16px;
   border-bottom: 1px solid #eef2f7;
 }
@@ -191,21 +192,143 @@
   background: #070b12;
 }
 
+.control-snapshot-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex-shrink: 0;
+  min-height: 32px;
+  padding: 6px 9px;
+  border: 1px solid #2563eb;
+  border-radius: 6px;
+  background: #2563eb;
+  color: #ffffff;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.control-snapshot-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.control-snapshot-status {
+  margin: 0;
+  padding: 6px 12px;
+  background: #070b12;
+  color: #cbd5e1;
+  font-size: 10px;
+}
+
 .control-map-view {
-  height: calc(100% - 52px);
-  min-height: 248px;
+  flex: 0 0 220px;
+  height: 220px;
+  min-height: 220px;
 }
 
 .control-map-view .apex-map {
   height: 100%;
-  min-height: 248px;
+  min-height: 220px;
   border: 0;
   border-radius: 0;
 }
 
 .control-map-view .apex-map-container,
 .control-map-view .apex-map .leaflet-container {
-  min-height: 248px;
+  min-height: 220px;
+}
+
+.control-map-card {
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+}
+
+.control-geofence-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid #eef2f7;
+}
+
+.control-geofence-form-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: #334155;
+  font-size: 10px;
+}
+
+.control-geofence-form-header span,
+.control-geofence-center {
+  color: #64748b;
+  font-size: 9px;
+}
+
+.control-geofence-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #334155;
+  font-size: 10px;
+}
+
+.control-geofence-settings {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 100px auto auto;
+  align-items: end;
+  gap: 7px;
+}
+
+.control-geofence-settings label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: #64748b;
+  font-size: 9px;
+}
+
+.control-geofence-settings input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px;
+  border: 1px solid #cbd5e1;
+  border-radius: 5px;
+  color: #111827;
+  font: inherit;
+}
+
+.control-geofence-settings button {
+  min-height: 29px;
+  padding: 6px 8px;
+  border: 1px solid #2563eb;
+  border-radius: 5px;
+  background: #2563eb;
+  color: #ffffff;
+  font: inherit;
+  font-size: 9px;
+  cursor: pointer;
+}
+
+.control-geofence-settings button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.control-geofence-settings .control-geofence-remove {
+  border-color: #cbd5e1;
+  background: #ffffff;
+  color: #475569;
+}
+
+.control-geofence-message {
+  color: #475569;
+  font-size: 9px;
 }
 
 /* BOTTOM CONTROL AREA */
@@ -214,14 +337,14 @@
   display: grid;
   grid-template-columns: minmax(280px, 1.15fr) minmax(260px, 0.85fr) minmax(190px, 0.55fr);
   gap: 16px;
-  height: calc(58% - 16px);
-  min-height: 0;
+  height: auto;
+  min-height: 340px;
   margin-top: 16px;
 }
 
 .control-card {
   min-width: 0;
-  min-height: 0;
+  min-height: 300px;
   overflow: hidden;
   border: 1px solid #e2e8f0;
   border-radius: 11px;
@@ -521,12 +644,6 @@
 }
 
 @media (max-width: 850px) {
-  .control-page {
-    height: auto;
-    min-height: calc(100vh - 74px);
-    overflow: visible;
-  }
-
   .control-live-grid {
     height: auto;
     grid-template-columns: 1fr;
@@ -534,6 +651,14 @@
 
   .control-live-card {
     height: 330px;
+  }
+
+  .control-live-card.control-map-card {
+    height: auto;
+  }
+
+  .control-geofence-settings {
+    grid-template-columns: minmax(0, 1fr) 100px auto auto;
   }
 
   .control-bottom-grid {

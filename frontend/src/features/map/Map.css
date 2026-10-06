@@ -22,6 +22,34 @@
   font-family: Inter, sans-serif;
 }
 
+.apex-map-selectable {
+  cursor: crosshair;
+}
+
+.apex-map-geofence-status {
+  position: absolute;
+  z-index: 500;
+  right: 12px;
+  bottom: 30px;
+  padding: 7px 9px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.95);
+  color: #334155;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.apex-map-geofence-status.inside {
+  border-color: #bbf7d0;
+  color: #15803d;
+}
+
+.apex-map-geofence-status.outside {
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
 .apex-map .leaflet-control-zoom {
   margin: 14px !important;
   overflow: hidden;

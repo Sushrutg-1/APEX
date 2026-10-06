@@ -1,5 +1,6 @@
 import env from '../config/env.config.js';
 import ApiError from '../utils/ApiError.js';
+import HTTP_STATUS from '../constants/httpStatus.constant.js';
 
 const errorHandler = (err, req, res, next) => {
   console.error(err);
@@ -11,6 +12,22 @@ const errorHandler = (err, req, res, next) => {
       message: err.message,
       errors: err.errors || [],
       stack: env.NODE_ENV === 'development' ? err.stack : undefined,
+    });
+  }
+
+  if (err.status === HTTP_STATUS.PAYLOAD_TOO_LARGE) {
+    return res.status(HTTP_STATUS.PAYLOAD_TOO_LARGE).json({
+      success: false,
+      statusCode: HTTP_STATUS.PAYLOAD_TOO_LARGE,
+      message: 'Request body exceeds the allowed size.',
+    });
+  }
+
+  if (err.type === 'entity.parse.failed') {
+    return res.status(HTTP_STATUS.BAD_REQUEST).json({
+      success: false,
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+      message: 'Invalid request body.',
     });
   }
 

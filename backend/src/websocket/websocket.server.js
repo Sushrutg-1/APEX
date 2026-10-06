@@ -67,11 +67,26 @@ const authenticateController = async (socket, request) => {
 
   const decodedToken = jwt.verify(accessToken, env.ACCESS_TOKEN_SECRET);
 
+  if (!decodedToken.userId || !decodedToken.vehicleId) {
+    socket.close(1008, 'Vehicle access is unavailable');
+    return;
+  }
+
+  const vehicle = await Vehicle.findOne({
+    vehicleId: decodedToken.vehicleId,
+    owner: decodedToken.userId,
+  });
+
+  if (!vehicle) {
+    socket.close(1008, 'Vehicle access is unavailable');
+    return;
+  }
+
   socket.user = decodedToken;
 
   console.log(`Controller authenticated: ${socket.user.username}`);
 
-  handleVehicleSocket(socket);
+  handleVehicleSocket(socket, vehicle);
 };
 
 const authenticateDevice = async (socket, request) => {
@@ -111,7 +126,7 @@ const authenticateDevice = async (socket, request) => {
 
   console.log(`Device authenticated: ${vehicle.vehicleId}`);
 
-    handleDeviceSocket(socket);
+  handleDeviceSocket(socket);
 };
 
 export default createWebSocketServer;
