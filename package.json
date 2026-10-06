@@ -4,6 +4,7 @@
   "private": true,
   "description": "APEX - Advanced Platform for Event Intelligence and Execution",
   "scripts": {
+    "dev": "concurrently -n BACKEND,FRONTEND -c blue,green \"pnpm --dir backend dev\" \"pnpm --dir frontend dev\"",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
@@ -15,5 +16,8 @@
   ],
   "author": "Sushrut Gondane",
   "license": "ISC",
-  "packageManager": "pnpm@10.34.5"
+  "packageManager": "pnpm@10.34.5",
+  "devDependencies": {
+    "concurrently": "^10.0.4"
+  }
 }

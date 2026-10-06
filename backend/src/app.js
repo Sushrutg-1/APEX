@@ -1,7 +1,12 @@
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
+
 import env from './config/env.config.js';
+
+import authRoutes from './routes/auth.routes.js';
+import testRoutes from './routes/test.routes.js';
+
 import errorHandler from './middlewares/errorHandler.middleware.js';
 
 const app = express();
@@ -12,16 +17,21 @@ app.use(
     credentials: true,
   })
 );
+
 app.use(express.json({ limit: '16kb' }));
 app.use(express.urlencoded({ extended: true, limit: '16kb' }));
 app.use(express.static('public'));
 app.use(cookieParser());
 
-// Import Routers
-
 app.get('/health-check', (req, res) => {
-  res.status(200).json({ status: 'OK', message: 'APEX is running!' });
+  res.status(200).json({
+    status: 'OK',
+    message: 'APEX is running!',
+  });
 });
+
+app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/test', testRoutes);
 
 app.use(errorHandler);
 

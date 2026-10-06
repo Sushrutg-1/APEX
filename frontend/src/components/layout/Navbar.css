@@ -1,0 +1,274 @@
+/* =========================================================
+   APEX NAVBAR
+   ========================================================= */
+
+.apex-navbar {
+  position: relative;
+
+  width: 100%;
+  height: 72px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 0 32px;
+
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+
+  z-index: 20;
+}
+
+/* =========================================================
+   VEHICLE
+   ========================================================= */
+
+.apex-navbar-vehicle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.apex-navbar-label {
+  color: #94a3b8;
+
+  font-size: 10px;
+  font-weight: 700;
+
+  letter-spacing: 0.1em;
+}
+
+.apex-navbar-vehicle-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  color: #111827;
+
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.apex-navbar-status-dot {
+  width: 7px;
+  height: 7px;
+
+  flex-shrink: 0;
+
+  border-radius: 50%;
+}
+
+.apex-navbar-status-dot.online {
+  background: #16a34a;
+}
+
+.apex-navbar-status-dot.offline {
+  background: #dc2626;
+}
+
+/* =========================================================
+   ACTIONS
+   ========================================================= */
+
+.apex-navbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.apex-navbar-icon-button {
+  width: 36px;
+  height: 36px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+
+  border: 1px solid #e2e8f0;
+  border-radius: 7px;
+
+  background: #ffffff;
+  color: #64748b;
+
+  cursor: pointer;
+
+  transition:
+    color 0.2s ease,
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+
+.apex-navbar-icon-button:hover {
+  color: #111827;
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+/* =========================================================
+   ACCOUNT
+   ========================================================= */
+
+.apex-account {
+  position: relative;
+}
+
+.apex-account-button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  padding: 0;
+
+  border: 0;
+
+  background: transparent;
+  color: #64748b;
+
+  cursor: pointer;
+}
+
+.apex-avatar {
+  width: 34px;
+  height: 34px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 7px;
+
+  background: #e8eefc;
+  color: #2563eb;
+
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.apex-account-details {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+
+  gap: 2px;
+}
+
+.apex-account-details strong {
+  color: #111827;
+
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.apex-account-details small {
+  color: #94a3b8;
+
+  font-size: 10px;
+}
+
+/* =========================================================
+   ACCOUNT MENU
+   ========================================================= */
+
+.apex-account-menu {
+  position: absolute;
+
+  top: calc(100% + 12px);
+  right: 0;
+
+  width: 190px;
+
+  padding: 8px;
+
+  background: #ffffff;
+
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.1);
+
+  z-index: 50;
+}
+
+.apex-account-menu-user {
+  display: flex;
+  flex-direction: column;
+
+  gap: 3px;
+
+  padding: 10px;
+
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.apex-account-menu-user strong {
+  color: #111827;
+
+  font-size: 12px;
+}
+
+.apex-account-menu-user span {
+  color: #94a3b8;
+
+  font-size: 10px;
+}
+
+.apex-logout-button {
+  width: 100%;
+
+  display: flex;
+  align-items: center;
+
+  gap: 8px;
+
+  margin-top: 4px;
+  padding: 10px;
+
+  border: 0;
+  border-radius: 6px;
+
+  background: transparent;
+  color: #dc2626;
+
+  font-size: 11px;
+  font-weight: 600;
+
+  cursor: pointer;
+
+  text-align: left;
+}
+
+.apex-logout-button:hover {
+  background: #fef2f2;
+}
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+
+@media (max-width: 700px) {
+  .apex-navbar {
+    height: 64px;
+    padding: 0 18px;
+  }
+
+  .apex-navbar-label {
+    display: none;
+  }
+
+  .apex-account-details {
+    display: none;
+  }
+}
+
+@media (max-width: 420px) {
+  .apex-navbar {
+    padding: 0 14px;
+  }
+
+  .apex-navbar-icon-button {
+    display: none;
+  }
+}

@@ -1,0 +1,14 @@
+const VEHICLE_COMMAND = {
+  FORWARD: 'FORWARD',
+  BACKWARD: 'BACKWARD',
+  LEFT: 'LEFT',
+  RIGHT: 'RIGHT',
+  STOP: 'STOP',
+
+  PAN: 'PAN',
+  TILT: 'TILT',
+
+  HORN: 'HORN',
+};
+
+export default VEHICLE_COMMAND;
