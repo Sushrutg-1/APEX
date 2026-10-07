@@ -13,6 +13,16 @@ const snapshotSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    deletedAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
     image: {
       type: Buffer,
       required: true,
@@ -59,6 +69,8 @@ const snapshotSchema = new mongoose.Schema(
 );
 
 snapshotSchema.index({ vehicle: 1, createdAt: -1 });
+snapshotSchema.index({ isDeleted: 1, createdAt: -1 });
+snapshotSchema.index({ vehicle: 1, isDeleted: 1, createdAt: -1 });
 
 const Snapshot = mongoose.model('Snapshot', snapshotSchema);
 

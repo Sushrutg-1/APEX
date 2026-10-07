@@ -1,4 +1,4 @@
-import { Bell, ChevronDown, LogOut } from 'lucide-react';
+import { ChevronDown, LogOut } from 'lucide-react';
 import { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
@@ -42,10 +42,6 @@ function Navbar() {
       </div>
 
       <div className="apex-navbar-actions">
-        <button type="button" className="apex-navbar-icon-button" aria-label="Notifications">
-          <Bell size={18} strokeWidth={1.8} />
-        </button>
-
         <div className="apex-account">
           <button
             type="button"

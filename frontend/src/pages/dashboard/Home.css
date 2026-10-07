@@ -1006,3 +1006,282 @@
     padding: 10px;
   }
 }
+
+.apex-event-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+  background: #ffffff;
+}
+
+.apex-event-toolbar-compact {
+  justify-content: flex-end;
+}
+
+.apex-event-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.apex-event-filters button {
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 7px 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.apex-event-filters button.is-active {
+  background: #dbeafe;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
+}
+
+.apex-search-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: min(280px, 100%);
+  padding: 8px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 7px;
+  background: #f8fafc;
+  color: #64748b;
+}
+
+.apex-search-field input {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: #111827;
+  font: inherit;
+  outline: none;
+}
+
+.apex-search-field input::placeholder {
+  color: #94a3b8;
+}
+
+.apex-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 180px;
+  padding: 26px 18px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 9px;
+  background: #ffffff;
+  color: #64748b;
+  text-align: center;
+}
+
+.apex-empty-state strong {
+  color: #111827;
+  font-size: 14px;
+}
+
+.apex-empty-state span {
+  max-width: 420px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.apex-event-list-detailed {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.apex-event-list-detailed li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 16px 18px;
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+  background: #ffffff;
+}
+
+.apex-event-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.apex-event-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.apex-event-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 7px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.apex-event-badge.critical {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.apex-event-badge.warning {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.apex-event-badge.info {
+  background: #e0f2fe;
+  color: #075985;
+}
+
+.apex-event-main strong {
+  color: #111827;
+  font-size: 13px;
+}
+
+.apex-event-subtext,
+.apex-event-location {
+  color: #64748b;
+  font-size: 11px;
+}
+
+.apex-event-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  min-width: 180px;
+}
+
+.apex-event-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #475569;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.apex-snapshot-grid-compact {
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+
+.apex-snapshot-image-button {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.apex-snapshot-image-button img {
+  display: block;
+  width: 100%;
+  height: 170px;
+  object-fit: cover;
+}
+
+.apex-snapshot-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.apex-preview-backdrop {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.68);
+  z-index: 2000;
+}
+
+.apex-preview-modal {
+  width: min(760px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.2);
+}
+
+.apex-preview-modal img {
+  width: 100%;
+  max-height: 62vh;
+  object-fit: contain;
+  border-radius: 8px;
+  background: #0f172a;
+}
+
+.apex-preview-close {
+  align-self: flex-end;
+  border: 1px solid #e2e8f0;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #334155;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 7px 10px;
+}
+
+.apex-preview-content {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: #64748b;
+  font-size: 11px;
+}
+
+.apex-preview-content strong {
+  color: #111827;
+  font-size: 14px;
+}
+
+@media (max-width: 700px) {
+  .apex-event-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .apex-search-field {
+    min-width: 0;
+  }
+
+  .apex-event-list-detailed li {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .apex-event-side {
+    align-items: flex-start;
+    min-width: 0;
+  }
+}

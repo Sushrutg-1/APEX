@@ -7,11 +7,11 @@
 #endif
 
 #ifndef APEX_WIFI_SSID
-#define APEX_WIFI_SSID ""
+#define APEX_WIFI_SSID "ABCDEF"
 #endif
 
 #ifndef APEX_WIFI_PASSWORD
-#define APEX_WIFI_PASSWORD ""
+#define APEX_WIFI_PASSWORD "12345678"
 #endif
 
 const uint16_t CAMERA_WS_PORT = 81;

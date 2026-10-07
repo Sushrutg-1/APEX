@@ -304,8 +304,11 @@ const getHistory = async (req, res, next) => {
   try {
     const vehicle = await getOwnedVehicle(req);
     const [events, snapshots] = await Promise.all([
-      Event.find({ vehicle: vehicle._id }).sort({ createdAt: -1 }).limit(100).lean(),
-      Snapshot.find({ vehicle: vehicle._id })
+      Event.find({ vehicle: vehicle._id, isDeleted: false })
+        .sort({ createdAt: -1 })
+        .limit(100)
+        .lean(),
+      Snapshot.find({ vehicle: vehicle._id, isDeleted: false })
         .select('-image')
         .sort({ createdAt: -1 })
         .limit(24)
