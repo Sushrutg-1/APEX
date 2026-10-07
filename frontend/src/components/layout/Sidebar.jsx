@@ -1,4 +1,4 @@
-import { Activity, Camera, History, LayoutDashboard, Settings } from 'lucide-react';
+import { Activity, Clock3, Image, LayoutDashboard, ShieldAlert } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 
@@ -36,10 +36,26 @@ function Sidebar() {
         </NavLink>
 
         <NavLink
+          to="/dashboard/events"
+          className={({ isActive }) => `apex-sidebar-link ${isActive ? 'active' : ''}`}
+        >
+          <ShieldAlert size={18} strokeWidth={1.8} />
+          <span>Events</span>
+        </NavLink>
+
+        <NavLink
+          to="/dashboard/snapshots"
+          className={({ isActive }) => `apex-sidebar-link ${isActive ? 'active' : ''}`}
+        >
+          <Image size={18} strokeWidth={1.8} />
+          <span>Snapshots</span>
+        </NavLink>
+
+        <NavLink
           to="/dashboard/history"
           className={({ isActive }) => `apex-sidebar-link ${isActive ? 'active' : ''}`}
         >
-          <History size={18} strokeWidth={1.8} />
+          <Clock3 size={18} strokeWidth={1.8} />
           <span>History</span>
         </NavLink>
       </nav>

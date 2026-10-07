@@ -9,6 +9,8 @@ import MainLayout from '../layout/MainLayout';
 import Home from '../pages/dashboard/Home';
 import Control from '../pages/dashboard/Control';
 import History from '../pages/dashboard/History';
+import Events from '../pages/dashboard/Events';
+import Snapshots from '../pages/dashboard/Snapshots';
 
 import ProtectedRoute from './ProtectedRoute';
 
@@ -25,6 +27,8 @@ function AppRoutes() {
         <Route path="/dashboard" element={<MainLayout />}>
           <Route index element={<Home />} />
           <Route path="control" element={<Control />} />
+          <Route path="events" element={<Events />} />
+          <Route path="snapshots" element={<Snapshots />} />
           <Route path="history" element={<History />} />
         </Route>
       </Route>

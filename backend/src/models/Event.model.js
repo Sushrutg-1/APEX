@@ -13,6 +13,16 @@ const eventSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    deletedAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
     type: {
       type: String,
       enum: [
@@ -46,6 +56,8 @@ const eventSchema = new mongoose.Schema(
 );
 
 eventSchema.index({ vehicle: 1, createdAt: -1 });
+eventSchema.index({ isDeleted: 1, createdAt: -1 });
+eventSchema.index({ vehicle: 1, isDeleted: 1, createdAt: -1 });
 
 const Event = mongoose.model('Event', eventSchema);
 
