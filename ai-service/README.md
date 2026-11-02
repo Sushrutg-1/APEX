@@ -23,7 +23,7 @@ py -3.12 -m venv .venv
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 if (-not (Test-Path .env)) { Copy-Item .env.example .env }
-python -m uvicorn main:app --host 127.0.0.1 --port 8000
+python -m uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
 The first startup needs internet access to download model weights. To use a
@@ -32,9 +32,12 @@ its path before starting the service. Do not commit model weights. A simple
 model filename is resolved inside `~/.cache/apex/`; an absolute or nested path
 is used as provided.
 
-The health endpoint is `http://127.0.0.1:8000/health-check`. Inference accepts
-raw `image/jpeg` bodies at `/detect` and returns model class names, confidence,
+The health endpoints are `/health` and `/ready`. Inference accepts raw
+`image/jpeg` bodies at `/detect` and returns model class names, confidence,
 original image dimensions, and boxes in original-image pixel coordinates.
+
+For a deployed service, use `PORT` supplied by the hosting platform. The
+service binds to `0.0.0.0`; for local development the default port is 8000.
 
 ## Backend settings
 

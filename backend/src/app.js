@@ -1,6 +1,7 @@
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
+import mongoose from 'mongoose';
 
 import env from './config/env.config.js';
 
@@ -28,6 +29,29 @@ app.get('/health-check', (req, res) => {
   res.status(200).json({
     status: 'OK',
     message: 'APEX is running!',
+  });
+});
+
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    service: 'apex-backend',
+  });
+});
+
+app.get('/ready', (req, res) => {
+  const isDatabaseReady = mongoose.connection.readyState === 1;
+
+  if (!isDatabaseReady) {
+    return res.status(503).json({
+      status: 'not_ready',
+      service: 'apex-backend',
+    });
+  }
+
+  return res.status(200).json({
+    status: 'ready',
+    service: 'apex-backend',
   });
 });
 

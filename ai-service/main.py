@@ -9,6 +9,7 @@ from types import SimpleNamespace
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 from PIL import Image, UnidentifiedImageError
 from starlette.concurrency import run_in_threadpool
 import torch
@@ -152,6 +153,14 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="APEX YOLO Inference", lifespan=lifespan)
 
 
+def is_model_loaded() -> bool:
+    return getattr(app.state, "model", None) is not None
+
+
+def can_accept_inference() -> bool:
+    return is_model_loaded() and not inference_lock.locked()
+
+
 async def read_jpeg(request: Request) -> bytes:
     content_type = request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
     if content_type != "image/jpeg":
@@ -245,8 +254,40 @@ def get_detections(
 async def health_check():
     return {
         "status": "ok",
-        "modelLoaded": getattr(app.state, "model", None) is not None,
+        "modelLoaded": is_model_loaded(),
         "activeTrackers": len(tracker_states),
+    }
+
+
+@app.get("/health")
+async def health():
+    return {
+        "status": "ok",
+        "service": "apex-ai-service",
+        "modelLoaded": is_model_loaded(),
+    }
+
+
+@app.get("/ready")
+async def ready():
+    model_loaded = is_model_loaded()
+    inference_accepted = can_accept_inference()
+    if not inference_accepted:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "not_ready",
+                "service": "apex-ai-service",
+                "modelLoaded": model_loaded,
+                "inferenceAccepted": False,
+            },
+        )
+
+    return {
+        "status": "ready",
+        "service": "apex-ai-service",
+        "modelLoaded": True,
+        "inferenceAccepted": True,
     }
 
 

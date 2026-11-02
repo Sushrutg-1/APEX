@@ -8,7 +8,8 @@ WebSockets, YOLO11 object detection, ByteTrack tracking, snapshots, and event
 history.
 
 This document describes the implementation currently present in this
-repository. It does not describe cloud deployment or Docker.
+repository, including the health endpoints used by deployed services. It does
+not require Docker.
 
 ## 2. Objectives and features
 
@@ -70,10 +71,24 @@ py -3.12 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
 Copy-Item .env.example .env
-python -m uvicorn main:app --host 127.0.0.1 --port 8000
+python -m uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
 The first model startup may download `yolo11n.pt` to the local cache.
+
+### Deployment health checks
+
+Use these public endpoints for deployed services:
+
+- Backend health: `https://BACKEND-URL/health`
+- Backend readiness: `https://BACKEND-URL/ready`
+- AI service health: `https://AI-SERVICE-URL/health`
+- AI readiness: `https://AI-SERVICE-URL/ready`
+
+Configure Render's health check path as `/health`. If the goal is to reduce
+free-tier spin-down, configure an external uptime monitor to request each
+deployed Render service's `/health` endpoint every 10–12 minutes. The Netlify
+frontend is a static site and does not need a keep-alive endpoint.
 
 ## 6. Environment configuration
 
@@ -207,6 +222,8 @@ the existing `frontend/public/brand/favicon.svg`.
 
 | Method | Endpoint | Auth | Purpose |
 |---|---|---|---|
+| GET | `/health` | No | Lightweight backend health |
+| GET | `/ready` | No | Backend MongoDB readiness |
 | GET | `/health-check` | No | Backend health |
 | POST | `/api/v1/auth/register` | No | Register user and vehicle |
 | POST | `/api/v1/auth/login` | No | Create access/refresh tokens |
