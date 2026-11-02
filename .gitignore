@@ -1,9 +1,13 @@
+# ==========================================
+# APEX PROJECT - ROOT GITIGNORE
+# ==========================================
+
 # Dependencies
 node_modules/
 .pnpm-store/
 
 # Environment variables
-# .env
+.env
 .env.*
 !.env.example
 
@@ -11,6 +15,9 @@ node_modules/
 dist/
 build/
 out/
+.next/
+.nuxt/
+.output/
 
 # Logs
 *.log
@@ -24,10 +31,12 @@ coverage/
 .cache/
 .vite/
 .parcel-cache/
+.turbo/
 
 # OS files
 .DS_Store
 Thumbs.db
+Desktop.ini
 
 # IDE / Editors
 .vscode/
@@ -36,16 +45,38 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+*.bak
 
 # Python
 __pycache__/
 *.py[cod]
 .venv/
 venv/
+ENV/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
 # ESP32 / Arduino
 .arduino/
+.pio/
 esp32/firmware/**/firmware_secrets.h
+*.elf
+*.hex
+*.map
 
 # Local configuration
 *.local
+
+# Local databases
+*.sqlite
+*.sqlite3
+*.db
+
+# Backup files
+*.backup
+*.old
+
+# ==========================================
+# END OF APEX GITIGNORE
+# ==========================================
