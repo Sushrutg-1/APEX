@@ -11,8 +11,8 @@ import {
   vehicleEventReceived,
   updateGeofence,
   updateTelemetry,
-  vehicleOffline,
-  vehicleOnline,
+  deviceStatusChanged,
+  telemetryStatusChanged,
   websocketConnected,
   websocketConnecting,
   websocketDisconnected,
@@ -37,7 +37,9 @@ function MainLayout() {
       } else if (message.type === 'WS_ERROR') {
         dispatch(websocketError());
       } else if (message.type === 'DEVICE_STATUS') {
-        dispatch(message.status === 'online' ? vehicleOnline() : vehicleOffline());
+        dispatch(deviceStatusChanged(message));
+      } else if (message.type === 'TELEMETRY_STATUS') {
+        dispatch(telemetryStatusChanged(message));
       } else if (message.type === 'TELEMETRY') {
         dispatch(updateTelemetry(message.data ?? null));
       } else if (message.type === 'GEOFENCE_EVENT') {

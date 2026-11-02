@@ -14,6 +14,7 @@ import { useSelector } from 'react-redux';
 
 import cameraService from '../../features/camera/camera.service';
 import CameraFeed from '../../features/camera/CameraFeed';
+import DeviceSetup from '../../components/device/DeviceSetup';
 import { distanceBetweenMeters, isValidCoordinates } from '../../utils/geography';
 import { getCurrentWeather } from '../../services/weather.service';
 import './Home.css';
@@ -202,10 +203,11 @@ function WeatherCard({ location, weather, onWeatherChange }) {
 function Home() {
   const { vehicle } = useSelector((state) => state.auth);
   const {
-    status,
+    deviceStatus,
     telemetry,
     websocketConnected: wsConnected,
     websocketStatus,
+    telemetryStatus,
     geofence,
   } = useSelector((state) => state.vehicle);
   const [cameraStatus, setCameraStatus] = useState('UNAVAILABLE');
@@ -217,7 +219,7 @@ function Home() {
   /*
    * Never display old telemetry while rover is offline.
    */
-  const data = status === 'online' ? telemetry : null;
+  const data = deviceStatus === 'online' ? telemetry : null;
 
   useEffect(
     () =>
@@ -229,15 +231,13 @@ function Home() {
     []
   );
 
-  const isOnline = status === 'online';
+  const isOnline = deviceStatus === 'online';
 
   const statusClass = isOnline
     ? 'home-status home-status-online'
-    : status === 'offline'
-      ? 'home-status home-status-offline'
-      : 'home-status home-status-connecting';
+    : 'home-status home-status-offline';
 
-  const statusText = isOnline ? 'Online' : status === 'offline' ? 'Offline' : 'Connecting';
+  const statusText = isOnline ? 'Online' : 'Offline';
 
   const formatValue = (value, suffix = '') => {
     if (value === null || value === undefined) {
@@ -331,7 +331,7 @@ function Home() {
       <section className="home-status-card">
         <div className="home-status-main">
           <div className="home-status-icon">
-            {isOnline ? <Wifi size={22} /> : status === 'offline' ? <WifiOff size={22} /> : <Wifi size={22} />}
+            {isOnline ? <Wifi size={22} /> : <WifiOff size={22} />}
           </div>
 
           <div>
@@ -340,17 +340,13 @@ function Home() {
             <h2>
               {isOnline
                 ? 'Rover Online'
-                : status === 'offline'
-                  ? 'Rover Offline'
-                  : 'Connecting to rover'}
+                : 'Rover Offline'}
             </h2>
 
             <p>
               {isOnline
-                ? 'The rover is connected and sending live telemetry.'
-                : status === 'offline'
-                  ? 'The rover is disconnected. Live telemetry is unavailable.'
-                  : 'Waiting for device connection status.'}
+                ? 'The authenticated rover device is connected.'
+                : 'No authenticated rover device connection is active.'}
             </p>
           </div>
         </div>
@@ -372,8 +368,14 @@ function Home() {
               {wsConnected ? 'CONNECTED' : websocketStatus}
             </strong>
           </div>
+          <div>
+            <span>Telemetry</span>
+            <strong>{telemetryStatus}</strong>
+          </div>
         </div>
       </section>
+
+      <DeviceSetup />
 
       {/* ======================================================
           LIVE TELEMETRY

@@ -8,6 +8,13 @@ import {
   getDeviceSocket,
   getControllerSocket,
 } from './websocket.manager.js';
+import {
+  markDeviceOfflineIfDisconnected,
+  markDeviceOnline,
+  notifyTelemetryStatus,
+  touchDevice,
+  isDeviceHeartbeatExpired,
+} from './device.status.js';
 
 const TELEMETRY_TIMEOUT_MS = env.DEVICE_HEARTBEAT_TIMEOUT_MS;
 const SENSOR_STATE_LIMIT = 100;
@@ -59,20 +66,8 @@ const startTelemetryTimer = (vehicleId, socket) => {
     try {
       removeDeviceSocket(vehicleId, socket);
 
-      await Vehicle.updateOne(
-        {
-          vehicleId,
-        },
-        {
-          $set: {
-            status: 'offline',
-          },
-        }
-      );
-
       console.log(`[DEVICE OFFLINE] ${vehicleId} marked offline because telemetry stopped`);
-
-      notifyControllerDeviceStatus(vehicleId, 'offline');
+      await markDeviceOfflineIfDisconnected(vehicleId, socket);
 
       if (socket.readyState === 1) {
         socket.close();
@@ -90,7 +85,7 @@ const startTelemetryTimer = (vehicleId, socket) => {
 /*
  * Handle authenticated ESP32/device WebSocket connection.
  */
-const handleDeviceSocket = (socket) => {
+const handleDeviceSocket = async (socket) => {
   const { vehicleId, name } = socket.device;
   const previousSocket = getDeviceSocket(vehicleId);
 
@@ -122,7 +117,8 @@ const handleDeviceSocket = (socket) => {
   /*
    * Notify dashboard that the vehicle is online.
    */
-  notifyControllerDeviceStatus(vehicleId, 'online');
+  await markDeviceOnline(vehicleId, socket);
+  notifyTelemetryStatus(vehicleId, 'NOT_RECEIVED');
 
   /*
    * Start telemetry timeout.
@@ -136,6 +132,8 @@ const handleDeviceSocket = (socket) => {
     if (getDeviceSocket(vehicleId) !== socket) {
       return;
     }
+
+    await touchDevice(vehicleId, socket);
 
     let data;
 
@@ -190,21 +188,11 @@ const handleDeviceSocket = (socket) => {
     }
 
     try {
-      await Vehicle.updateOne(
-        {
-          vehicleId,
-        },
-        {
-          $set: {
-            status: 'offline',
-          },
-        }
-      );
+      await markDeviceOfflineIfDisconnected(vehicleId, socket);
     } catch (error) {
       console.error(`[DEVICE OFFLINE ERROR] ${vehicleId}:`, error);
     }
 
-    notifyControllerDeviceStatus(vehicleId, 'offline');
   });
 
   /*
@@ -212,6 +200,18 @@ const handleDeviceSocket = (socket) => {
    */
   socket.on('error', (error) => {
     console.error(`[DEVICE SOCKET ERROR] ${vehicleId}:`, error);
+    if (getDeviceSocket(vehicleId) !== socket) {
+      return;
+    }
+
+    clearTelemetryTimer(vehicleId);
+    removeDeviceSocket(vehicleId, socket);
+    void markDeviceOfflineIfDisconnected(vehicleId, socket).catch((error) => {
+      console.error(`[DEVICE ERROR STATE ERROR] ${vehicleId}:`, error.message);
+    });
+    if (socket.readyState === 1) {
+      socket.close(1011, 'Device socket error');
+    }
   });
 };
 
@@ -301,7 +301,6 @@ const processTelemetry = async (socket, data) => {
     { vehicleId },
     {
       $set: {
-        status: 'online',
         telemetry,
         lastTelemetryAt: new Date(),
       },
@@ -318,6 +317,8 @@ const processTelemetry = async (socket, data) => {
    * Restart the offline timer.
    */
   startTelemetryTimer(vehicleId, socket);
+  socket.lastTelemetryAt = vehicle.lastTelemetryAt;
+  notifyTelemetryStatus(vehicleId, 'RECEIVING', vehicle.lastTelemetryAt);
 
   const controllerSocket = getControllerSocket(vehicleId);
   await processGeofence(vehicle, telemetry, controllerSocket);
@@ -560,6 +561,18 @@ const handlePing = (socket) => {
    * PING also proves that the device is alive.
    */
   startTelemetryTimer(vehicleId, socket);
+  void touchDevice(vehicleId, socket).catch((error) => {
+    console.error(`[DEVICE HEARTBEAT LAST-SEEN ERROR] ${vehicleId}:`, error.message);
+  });
+  notifyTelemetryStatus(
+    vehicleId,
+    socket.lastTelemetryAt && !isDeviceHeartbeatExpired(socket.lastTelemetryAt)
+      ? 'RECEIVING'
+      : socket.lastTelemetryAt
+        ? 'STALE'
+        : 'NOT_RECEIVED',
+    socket.lastTelemetryAt || null
+  );
 
   sendMessage(socket, {
     type: 'PONG',
@@ -607,23 +620,6 @@ const handleDeviceError = (socket, data) => {
     type: 'DEVICE_ERROR',
     vehicleId,
     message: data.message || 'Device reported an error',
-  });
-};
-
-/*
- * Notify dashboard about ESP32 online/offline status.
- */
-const notifyControllerDeviceStatus = (vehicleId, status) => {
-  const controllerSocket = getControllerSocket(vehicleId);
-
-  if (!controllerSocket || controllerSocket.readyState !== 1) {
-    return;
-  }
-
-  sendMessage(controllerSocket, {
-    type: 'DEVICE_STATUS',
-    vehicleId,
-    status,
   });
 };
 

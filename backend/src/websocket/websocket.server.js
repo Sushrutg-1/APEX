@@ -148,18 +148,9 @@ const authenticateDevice = async (socket, request) => {
     return;
   }
 
-  await Vehicle.updateOne(
-    { _id: vehicle._id },
-    {
-      $set: {
-        status: 'online',
-      },
-    }
-  );
-
   console.log(`Device authenticated: ${vehicle.vehicleId}`);
 
-  handleDeviceSocket(socket);
+  await handleDeviceSocket(socket);
 };
 
 export default createWebSocketServer;

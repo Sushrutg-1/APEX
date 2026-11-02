@@ -5,6 +5,11 @@ import {
   setCameraSocket,
 } from './websocket.manager.js';
 import { resetYoloTracker } from '../services/yolo.service.js';
+import {
+  markDeviceOfflineIfDisconnected,
+  markDeviceOnline,
+  touchDevice,
+} from './device.status.js';
 
 const OPEN = 1;
 const FRAME_TIMEOUT_MS = 5000;
@@ -35,6 +40,9 @@ const handleCameraSocket = (socket, vehicle) => {
   }
 
   setCameraSocket(vehicleId, socket);
+  void markDeviceOnline(vehicleId, socket).catch((error) => {
+    console.error(`[CAMERA ONLINE STATE ERROR] ${vehicleId}:`, error.message);
+  });
   socket.cameraHasFrame = false;
   notifyController(vehicleId, 'connecting');
   let frameTimer = null;
@@ -43,11 +51,20 @@ const handleCameraSocket = (socket, vehicle) => {
     frameTimer = setTimeout(() => {
       if (getCameraSocket(vehicleId) === socket) {
         socket.cameraHasFrame = false;
-        notifyController(vehicleId, 'offline');
+        removeCameraSocket(vehicleId, socket);
+        void markDeviceOfflineIfDisconnected(vehicleId, socket).catch((error) => {
+          console.error(`[CAMERA TIMEOUT STATE ERROR] ${vehicleId}:`, error.message);
+        });
+        if (socket.readyState === OPEN) {
+          socket.close(4000, 'Camera heartbeat timeout');
+        }
       }
     }, FRAME_TIMEOUT_MS);
   };
   resetFrameTimer();
+  void touchDevice(vehicleId, socket).catch((error) => {
+    console.error(`[CAMERA LAST-SEEN ERROR] ${vehicleId}:`, error.message);
+  });
 
   socket.on('message', (message, isBinary) => {
     if (getCameraSocket(vehicleId) !== socket || !isBinary || message.length === 0) {
@@ -100,12 +117,26 @@ const handleCameraSocket = (socket, vehicle) => {
     if (removeCameraSocket(vehicleId, socket)) {
       frameCounters.delete(vehicleId);
       void resetYoloTracker(vehicleId);
-      notifyController(vehicleId, 'offline');
+      void markDeviceOfflineIfDisconnected(vehicleId, socket).catch((error) => {
+        console.error(`[CAMERA CLOSE STATE ERROR] ${vehicleId}:`, error.message);
+      });
     }
   });
 
   socket.on('error', (error) => {
     console.error(`[CAMERA SOCKET ERROR] ${vehicleId}:`, error.message);
+    if (getCameraSocket(vehicleId) !== socket) {
+      return;
+    }
+
+    clearTimeout(frameTimer);
+    removeCameraSocket(vehicleId, socket);
+    void markDeviceOfflineIfDisconnected(vehicleId, socket).catch((error) => {
+      console.error(`[CAMERA ERROR STATE ERROR] ${vehicleId}:`, error.message);
+    });
+    if (socket.readyState === OPEN) {
+      socket.close(1011, 'Camera socket error');
+    }
   });
 };
 

@@ -23,11 +23,11 @@ import './Control.css';
 
 function Control() {
   const dispatch = useDispatch();
-  const { status, geofence } = useSelector((state) => state.vehicle);
+  const { deviceStatus, geofence } = useSelector((state) => state.vehicle);
 
-  const isOnline = status === 'online';
+  const isOnline = deviceStatus === 'online';
   const statusLabel =
-    status === 'online' ? 'Rover Online' : status === 'offline' ? 'Rover Offline' : 'Connecting';
+    deviceStatus === 'online' ? 'Rover Online' : 'Rover Offline';
 
   const [mode, setMode] = useState('CONTINUOUS');
   const [pan, setPan] = useState(90);

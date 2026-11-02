@@ -5,8 +5,15 @@ import env from './config/env.config.js';
 import connectToDB from './db/db.js';
 
 import createWebSocketServer from './websocket/websocket.server.js';
+import Vehicle from './models/Vehicle.model.js';
 
 connectToDB()
+  .then(() => {
+    return Vehicle.updateMany(
+      { status: 'online' },
+      { $set: { status: 'offline' } }
+    );
+  })
   .then(() => {
     const server = http.createServer(app);
 

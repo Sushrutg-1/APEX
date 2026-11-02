@@ -1175,6 +1175,14 @@
   min-width: 180px;
 }
 
+.apex-event-preview {
+  width: 58px;
+  height: 42px;
+  object-fit: cover;
+  border: 1px solid #dbe5f0;
+  border-radius: 5px;
+}
+
 .apex-event-status {
   display: inline-flex;
   align-items: center;

@@ -41,6 +41,11 @@ const vehicleSchema = new mongoose.Schema(
       default: null,
     },
 
+    lastSeenAt: {
+      type: Date,
+      default: null,
+    },
+
     geofence: {
       enabled: {
         type: Boolean,

@@ -12,6 +12,7 @@ import ApiResponse from '../utils/ApiResponse.js';
 
 import HTTP_STATUS from '../constants/httpStatus.constant.js';
 import API_MESSAGE from '../constants/apiMessage.constant.js';
+import { getDeviceStatus } from '../websocket/device.status.js';
 
 const login = async (req, res, next) => {
   try {
@@ -90,7 +91,7 @@ const login = async (req, res, next) => {
       vehicle: {
         vehicleId: vehicle.vehicleId,
         name: vehicle.name,
-        status: vehicle.status,
+        status: getDeviceStatus(vehicle.vehicleId),
       },
     };
 

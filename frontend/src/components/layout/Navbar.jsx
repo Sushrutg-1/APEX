@@ -12,7 +12,7 @@ function Navbar() {
   const navigate = useNavigate();
 
   const { user, vehicle } = useSelector((state) => state.auth);
-  const { status } = useSelector((state) => state.vehicle);
+  const { deviceStatus } = useSelector((state) => state.vehicle);
 
   const [showMenu, setShowMenu] = useState(false);
 
@@ -22,7 +22,7 @@ function Navbar() {
 
   const initials = username !== 'Unavailable' ? username.slice(0, 2).toUpperCase() : '--';
 
-  const isOnline = status === 'online';
+  const isOnline = deviceStatus === 'online';
 
   const handleLogout = () => {
     dispatch(logout());

@@ -4,10 +4,12 @@ import {
   getDeviceSocket,
   hasActiveController,
   getCameraSocket,
+  hasActiveDeviceConnection,
 } from './websocket.manager.js';
 
 import VEHICLE_COMMAND from '../constants/vehicleCommand.constant.js';
 import API_MESSAGE from '../constants/apiMessage.constant.js';
+import { getDeviceStatus, getTelemetryStatus } from './device.status.js';
 
 /*
  * Handle dashboard/controller WebSocket connection.
@@ -54,9 +56,30 @@ const handleVehicleSocket = (socket, vehicle) => {
     JSON.stringify({
       type: 'DEVICE_STATUS',
       vehicleId,
-      status: vehicle.status,
+      status: getDeviceStatus(vehicleId),
+      lastSeenAt: vehicle.lastSeenAt,
     })
   );
+
+  socket.send(JSON.stringify({
+    type: 'TELEMETRY_STATUS',
+    vehicleId,
+    status: getTelemetryStatus(vehicle),
+    lastTelemetryAt: vehicle.lastTelemetryAt,
+  }));
+
+  /*
+   * Persisted status is intentionally not used as a connection signal.
+   */
+  if (hasActiveDeviceConnection(vehicleId) && vehicle.telemetry) {
+    socket.send(
+      JSON.stringify({
+        type: 'TELEMETRY',
+        vehicleId,
+        data: vehicle.telemetry,
+      })
+    );
+  }
 
   socket.send(
     JSON.stringify({
@@ -66,15 +89,6 @@ const handleVehicleSocket = (socket, vehicle) => {
     })
   );
 
-  if (vehicle.status === 'online' && vehicle.telemetry) {
-    socket.send(
-      JSON.stringify({
-        type: 'TELEMETRY',
-        vehicleId,
-        data: vehicle.telemetry,
-      })
-    );
-  }
 
   /*
    * Handle messages coming from dashboard.

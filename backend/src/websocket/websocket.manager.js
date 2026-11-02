@@ -96,6 +96,11 @@ const hasActiveDevice = (vehicleId) => {
   return socket?.readyState === 1;
 };
 
+const hasActiveDeviceConnection = (vehicleId) =>
+  [getDeviceSocket(vehicleId), getCameraSocket(vehicleId)].some(
+    (socket) => socket?.readyState === 1
+  );
+
 /*
  * Remove the controller socket.
  *
@@ -169,6 +174,7 @@ export {
   getDeviceSocket,
   hasActiveController,
   hasActiveDevice,
+  hasActiveDeviceConnection,
   removeControllerSocket,
   removeDeviceSocket,
   setCameraSocket,

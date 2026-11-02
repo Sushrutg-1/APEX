@@ -5,14 +5,14 @@ import { useSelector } from 'react-redux';
 import './Sidebar.css';
 
 function Sidebar() {
-  const { status } = useSelector((state) => state.vehicle);
+  const { deviceStatus } = useSelector((state) => state.vehicle);
 
-  const isOnline = status === 'online';
+  const isOnline = deviceStatus === 'online';
 
   return (
     <aside className="apex-sidebar">
       <div className="apex-sidebar-brand">
-        <img src="/brand/logo.svg" alt="APEX" />
+        <img src="/brand/logo-dark.svg" alt="APEX" />
       </div>
 
       <nav className="apex-sidebar-nav">
@@ -67,7 +67,7 @@ function Sidebar() {
           <div>
             <strong>{isOnline ? 'Rover Online' : 'Rover Offline'}</strong>
 
-            <span>{isOnline ? 'Live telemetry active' : 'No live connection'}</span>
+            <span>{isOnline ? 'Authenticated device connected' : 'No device connection'}</span>
           </div>
         </div>
       </div>

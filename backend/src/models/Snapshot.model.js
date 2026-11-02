@@ -62,6 +62,11 @@ const snapshotSchema = new mongoose.Schema(
       type: String,
       default: 'ESP32-CAM',
     },
+    eventId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Event',
+      default: null,
+    },
   },
   {
     timestamps: true,

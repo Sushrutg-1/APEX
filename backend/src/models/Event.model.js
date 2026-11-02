@@ -28,6 +28,7 @@ const eventSchema = new mongoose.Schema(
       enum: [
         'GEOFENCE_VIOLATION',
         'SNAPSHOT',
+        'OBJECT_DETECTED',
         'FIRE_DETECTED',
         'OBSTACLE_DETECTED',
       ],

@@ -1,9 +1,12 @@
 import { createSlice } from '@reduxjs/toolkit';
 
 const initialState = {
-  status: 'connecting',
+  status: 'offline',
+  deviceStatus: 'offline',
+  lastSeenAt: null,
   telemetry: null,
   lastTelemetryAt: null,
+  telemetryStatus: 'NOT_RECEIVED',
   websocketConnected: false,
   websocketStatus: 'CONNECTING',
   geofence: null,
@@ -40,6 +43,11 @@ const vehicleSlice = createSlice({
     websocketConnecting: (state) => {
       state.websocketConnected = false;
       state.websocketStatus = 'CONNECTING';
+      state.deviceStatus = 'offline';
+      state.status = 'offline';
+      state.telemetryStatus = 'NOT_RECEIVED';
+      state.telemetry = null;
+      state.lastTelemetryAt = null;
     },
 
     websocketDisconnected: (state) => {
@@ -52,20 +60,27 @@ const vehicleSlice = createSlice({
       state.websocketStatus = 'ERROR';
     },
 
-    vehicleOnline: (state) => {
-      state.status = 'online';
-    },
-
-    vehicleOffline: (state) => {
-      state.status = 'offline';
-      state.telemetry = null;
-      state.lastTelemetryAt = null;
+    deviceStatusChanged: (state, action) => {
+      state.deviceStatus = action.payload.status === 'online' ? 'online' : 'offline';
+      state.status = state.deviceStatus;
+      state.lastSeenAt = action.payload.lastSeenAt || null;
+      if (state.deviceStatus === 'offline') {
+        state.telemetry = null;
+        state.lastTelemetryAt = null;
+      }
     },
 
     updateTelemetry: (state, action) => {
       state.telemetry = action.payload;
       state.lastTelemetryAt = Date.now();
-      state.status = 'online';
+      state.telemetryStatus = 'RECEIVING';
+    },
+
+    telemetryStatusChanged: (state, action) => {
+      state.telemetryStatus = action.payload.status;
+      if (action.payload.lastTelemetryAt) {
+        state.lastTelemetryAt = action.payload.lastTelemetryAt;
+      }
     },
 
     updateGeofence: (state, action) => {
@@ -97,9 +112,9 @@ export const {
   websocketConnecting,
   websocketDisconnected,
   websocketError,
-  vehicleOnline,
-  vehicleOffline,
+  deviceStatusChanged,
   updateTelemetry,
+  telemetryStatusChanged,
   updateGeofence,
   geofenceEvent,
   vehicleEventReceived,

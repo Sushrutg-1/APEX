@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { randomBytes } from 'node:crypto';
 
 import Event from '../models/Event.model.js';
 import Snapshot from '../models/Snapshot.model.js';
@@ -9,10 +10,14 @@ import HTTP_STATUS from '../constants/httpStatus.constant.js';
 import env from '../config/env.config.js';
 import { runYoloInference } from '../services/yolo.service.js';
 import { getControllerSocket } from '../websocket/websocket.manager.js';
+import { getDeviceStatus } from '../websocket/device.status.js';
 
 const SNAPSHOT_LIMIT_BYTES = 8 * 1024 * 1024;
 const AI_UNAVAILABLE_RETRY_MS = 5000;
+const DETECTION_EVENT_COOLDOWN_MS = 30000;
+const MAX_AUTOMATED_EVENTS_PER_FRAME = 5;
 const detectionStates = new Map();
+const detectionEventStates = new Map();
 let lastDetectionStatePruneAt = 0;
 
 const isJpeg = (image) =>
@@ -61,6 +66,119 @@ const getDetectionState = (vehicleId) => {
 };
 
 const getDetectionInterval = () => Math.ceil(1000 / env.YOLO_DETECTION_FPS);
+
+const getDeviceTokenMask = (token) =>
+  token ? `${token.slice(0, 4)}${'*'.repeat(Math.max(4, token.length - 8))}${token.slice(-4)}` : null;
+
+const getDeviceProvisioning = async (req, res, next) => {
+  try {
+    const vehicle = await getOwnedVehicle(req);
+    const reveal = req.query.reveal === 'true';
+    return res.status(HTTP_STATUS.OK).json(
+      new ApiResponse(
+        HTTP_STATUS.OK,
+        {
+          vehicleId: vehicle.vehicleId,
+          name: vehicle.name,
+          status: getDeviceStatus(vehicle.vehicleId),
+          lastSeenAt: vehicle.lastSeenAt,
+          deviceToken: reveal ? vehicle.deviceToken : getDeviceTokenMask(vehicle.deviceToken),
+          tokenRevealed: reveal,
+        },
+        'Device provisioning details retrieved'
+      )
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+
+const rotateDeviceToken = async (req, res, next) => {
+  try {
+    const vehicle = await getOwnedVehicle(req);
+    vehicle.deviceToken = randomBytes(32).toString('hex');
+    await vehicle.save();
+    return res.status(HTTP_STATUS.OK).json(
+      new ApiResponse(
+        HTTP_STATUS.OK,
+        { vehicleId: vehicle.vehicleId, deviceToken: vehicle.deviceToken },
+        'Device token regenerated. Update the firmware before reconnecting.'
+      )
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+
+const persistDetectionEvents = async (vehicle, image, detections, imageWidth, imageHeight) => {
+  const now = Date.now();
+  const state = detectionEventStates.get(vehicle.vehicleId) || new Map();
+  const telemetry = vehicle.telemetry || {};
+  const locationAvailable =
+    telemetry.gpsFix === true &&
+    Number.isFinite(telemetry.latitude) &&
+    Number.isFinite(telemetry.longitude);
+
+  const candidates = detections
+    .filter((detection) => detection?.className)
+    .slice(0, MAX_AUTOMATED_EVENTS_PER_FRAME);
+
+  for (const detection of candidates) {
+    const key = Number.isInteger(detection.trackId)
+      ? `track:${detection.trackId}`
+      : `class:${detection.className}`;
+    const previous = state.get(key);
+    if (previous && now - previous.lastEventAt < DETECTION_EVENT_COOLDOWN_MS) {
+      previous.lastSeenAt = now;
+      continue;
+    }
+
+    state.set(key, { lastSeenAt: now, lastEventAt: now });
+    try {
+      const snapshot = await Snapshot.create({
+        vehicle: vehicle._id,
+        vehicleId: vehicle.vehicleId,
+        image,
+        latitude: locationAvailable ? telemetry.latitude : null,
+        longitude: locationAvailable ? telemetry.longitude : null,
+        detectedObjects: [detection],
+        detectionStatus: 'AVAILABLE',
+        imageWidth,
+        imageHeight,
+        source: 'Automatic YOLO detection',
+      });
+      const event = await Event.create({
+        vehicle: vehicle._id,
+        vehicleId: vehicle.vehicleId,
+        type: 'OBJECT_DETECTED',
+        message: `${detection.className} detected`,
+        latitude: snapshot.latitude,
+        longitude: snapshot.longitude,
+        details: {
+          snapshotId: snapshot._id,
+          className: detection.className,
+          confidence: detection.confidence,
+          ...(Number.isInteger(detection.trackId) ? { trackId: detection.trackId } : {}),
+        },
+      });
+      snapshot.eventId = event._id;
+      await snapshot.save();
+      sendToController(vehicle.vehicleId, {
+        type: 'VEHICLE_EVENT',
+        event: event.toObject(),
+      });
+    } catch (error) {
+      console.error(`Automatic detection event failed for ${vehicle.vehicleId}:`, error.message);
+    }
+  }
+
+  for (const [key, item] of state) {
+    if (now - item.lastSeenAt > DETECTION_EVENT_COOLDOWN_MS * 2) {
+      state.delete(key);
+    }
+  }
+  detectionEventStates.set(vehicle.vehicleId, state);
+};
 
 const getLiveDetection = async (req, res, next) => {
   try {
@@ -154,6 +272,13 @@ const getLiveDetection = async (req, res, next) => {
 
       state.status = 'ACTIVE';
       sendToController(vehicle.vehicleId, detectionMessage);
+      void persistDetectionEvents(
+        vehicle,
+        image,
+        result.detections,
+        result.imageWidth,
+        result.imageHeight
+      );
 
       return res.status(HTTP_STATUS.OK).json(
         new ApiResponse(
@@ -203,7 +328,8 @@ const getVehicle = async (req, res, next) => {
         {
           vehicleId: vehicle.vehicleId,
           name: vehicle.name,
-          status: vehicle.status,
+          status: getDeviceStatus(vehicle.vehicleId),
+          lastSeenAt: vehicle.lastSeenAt,
           telemetry: vehicle.telemetry,
           lastTelemetryAt: vehicle.lastTelemetryAt,
           geofence: vehicle.geofence,
@@ -425,11 +551,13 @@ const getSnapshotImage = async (req, res, next) => {
 
 export {
   createSnapshot,
+  getDeviceProvisioning,
   getLiveDetection,
   getGeofence,
   getHistory,
   getSnapshotImage,
   getVehicle,
   removeGeofence,
+  rotateDeviceToken,
   updateGeofence,
 };

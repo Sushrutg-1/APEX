@@ -35,6 +35,7 @@ function Events() {
   const [error, setError] = useState('');
   const [filter, setFilter] = useState('ALL');
   const [search, setSearch] = useState('');
+  const [snapshotImages, setSnapshotImages] = useState({});
 
   useEffect(() => {
     let active = true;
@@ -61,6 +62,38 @@ function Events() {
       active = false;
     };
   }, [dispatch]);
+
+  useEffect(() => {
+    let active = true;
+    const objectUrls = [];
+    const snapshotIds = events
+      .map((event) => event.details?.snapshotId)
+      .filter(Boolean);
+
+    Promise.all(
+      snapshotIds.map(async (snapshotId) => {
+        try {
+          const { data } = await api.get(`/vehicles/me/snapshots/${snapshotId}/image`, {
+            responseType: 'blob',
+          });
+          const url = URL.createObjectURL(data);
+          objectUrls.push(url);
+          return [snapshotId, url];
+        } catch {
+          return [snapshotId, null];
+        }
+      })
+    ).then((entries) => {
+      if (active) {
+        setSnapshotImages(Object.fromEntries(entries));
+      }
+    });
+
+    return () => {
+      active = false;
+      objectUrls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [events]);
 
   const eventHistory = useMemo(() => {
     return events
@@ -151,12 +184,30 @@ function Events() {
                       <span>{event.type}</span>
                     </div>
                     <strong>{event.message}</strong>
+                    {event.details && (
+                      <span className="apex-event-subtext">
+                        {event.details.className || 'Object'}
+                        {Number.isFinite(event.details.confidence)
+                          ? ` · ${Math.round(event.details.confidence * 100)}% confidence`
+                          : ''}
+                        {Number.isInteger(event.details.trackId)
+                          ? ` · Track #${event.details.trackId}`
+                          : ''}
+                      </span>
+                    )}
                     <span className="apex-event-subtext">
                       {event.vehicleId} · {createdAt ? createdAt.toLocaleString() : 'Timestamp unavailable'}
                     </span>
                   </div>
 
                   <div className="apex-event-side">
+                    {event.details?.snapshotId && snapshotImages[event.details.snapshotId] && (
+                      <img
+                        className="apex-event-preview"
+                        src={snapshotImages[event.details.snapshotId]}
+                        alt={`Snapshot for ${event.message}`}
+                      />
+                    )}
                     <span className="apex-event-location">
                       {Number.isFinite(event.latitude) && Number.isFinite(event.longitude)
                         ? `${event.latitude.toFixed(6)}, ${event.longitude.toFixed(6)}`
