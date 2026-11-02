@@ -39,9 +39,16 @@ const parseNumber = (name, fallback, minimum, maximum) => {
 };
 
 const env = {
+  HOST: process.env.HOST || '0.0.0.0',
   PORT: process.env.PORT || 3000,
-  CORS_ORIGIN: process.env.CORS_ORIGIN,
-  NODE_ENV: process.env.NODE_ENV,
+  CORS_ORIGIN: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  NODE_ENV: process.env.NODE_ENV || 'development',
+  DEVICE_HEARTBEAT_TIMEOUT_MS: parseNumber(
+    'DEVICE_HEARTBEAT_TIMEOUT_MS',
+    15000,
+    5000,
+    120000
+  ),
 
   MONGODB_URI: process.env.MONGODB_URI,
   DEVICE_TOKEN: process.env.DEVICE_TOKEN,

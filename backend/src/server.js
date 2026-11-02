@@ -16,8 +16,8 @@ connectToDB()
 
     createWebSocketServer(server);
 
-    server.listen(env.PORT, () => {
-      console.log(`Server is running on port ${env.PORT}`);
+    server.listen(env.PORT, env.HOST, () => {
+      console.log(`Server is running on ${env.HOST}:${env.PORT}`);
     });
   })
   .catch((error) => {

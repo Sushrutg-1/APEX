@@ -1,5 +1,6 @@
 import Vehicle from '../models/Vehicle.model.js';
 import Event from '../models/Event.model.js';
+import env from '../config/env.config.js';
 
 import {
   setDeviceSocket,
@@ -8,7 +9,7 @@ import {
   getControllerSocket,
 } from './websocket.manager.js';
 
-const TELEMETRY_TIMEOUT_MS = 15000;
+const TELEMETRY_TIMEOUT_MS = env.DEVICE_HEARTBEAT_TIMEOUT_MS;
 const SENSOR_STATE_LIMIT = 100;
 const SENSOR_STATE_MAX_AGE_MS = 5 * 60 * 1000;
 

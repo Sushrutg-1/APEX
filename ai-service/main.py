@@ -2,12 +2,14 @@ import asyncio
 import hmac
 import io
 import os
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from PIL import Image, UnidentifiedImageError
 from starlette.concurrency import run_in_threadpool
+import torch
 from ultralytics import YOLO
 from dotenv import load_dotenv
 
@@ -17,6 +19,21 @@ MAX_IMAGE_BYTES = 8 * 1024 * 1024
 MAX_IMAGE_PIXELS = 25_000_000
 MAX_DETECTIONS = 100
 inference_lock = asyncio.Lock()
+inference_count = 0
+
+
+def get_image_size() -> int:
+    configured_size = int(os.getenv("YOLO_IMAGE_SIZE", "640"))
+    if configured_size < 320 or configured_size > 1280:
+        raise ValueError("YOLO_IMAGE_SIZE must be between 320 and 1280")
+    return configured_size
+
+
+def get_inference_device() -> str:
+    configured_device = os.getenv("YOLO_DEVICE", "").strip()
+    if configured_device:
+        return configured_device
+    return "cuda:0" if torch.cuda.is_available() else "cpu"
 
 
 @asynccontextmanager
@@ -26,7 +43,20 @@ async def lifespan(app: FastAPI):
         model_path = Path.home() / ".cache" / "apex" / model_path.name
     model_path.parent.mkdir(parents=True, exist_ok=True)
     app.state.model = YOLO(str(model_path))
-    print(f"YOLO model loaded: {model_path.name}")
+    app.state.device = get_inference_device()
+    app.state.image_size = get_image_size()
+    app.state.model.predict(
+        source=Image.new("RGB", (640, 640)),
+        conf=0.5,
+        max_det=1,
+        imgsz=app.state.image_size,
+        device=app.state.device,
+        verbose=False,
+    )
+    print(
+        f"YOLO model loaded: {model_path.name} device={app.state.device} "
+        f"imgsz={app.state.image_size} warmed=true"
+    )
     yield
     app.state.model = None
 
@@ -63,18 +93,29 @@ async def read_jpeg(request: Request) -> bytes:
     return image_bytes
 
 
-def get_detections(model: YOLO, image: Image.Image, confidence: float) -> list[dict]:
-    results = model.predict(
-        source=image,
-        conf=confidence,
-        max_det=MAX_DETECTIONS,
-        verbose=False,
-    )
+def get_detections(
+    model: YOLO,
+    image: Image.Image,
+    confidence: float,
+    device: str,
+    image_size: int,
+) -> tuple[list[dict], float]:
+    started_at = time.perf_counter()
+    with torch.inference_mode():
+        results = model.predict(
+            source=image,
+            conf=confidence,
+            max_det=MAX_DETECTIONS,
+            imgsz=image_size,
+            device=device,
+            verbose=False,
+        )
+    inference_ms = (time.perf_counter() - started_at) * 1000
     result = results[0]
     detections = []
 
     if result.boxes is None:
-        return detections
+        return detections, inference_ms
 
     boxes = result.boxes.xyxy.cpu().tolist()
     class_ids = result.boxes.cls.cpu().tolist()
@@ -102,7 +143,7 @@ def get_detections(model: YOLO, image: Image.Image, confidence: float) -> list[d
             }
         )
 
-    return detections
+    return detections, inference_ms
 
 
 @app.get("/health-check")
@@ -137,16 +178,31 @@ async def detect(
     if inference_lock.locked():
         raise HTTPException(status_code=429, detail="Inference is busy")
 
+    global inference_count
+    request_started_at = time.perf_counter()
     async with inference_lock:
-        detections = await run_in_threadpool(
+        detections, inference_ms = await run_in_threadpool(
             get_detections,
             app.state.model,
             rgb_image,
             confidence,
+            app.state.device,
+            app.state.image_size,
+        )
+    total_ms = (time.perf_counter() - request_started_at) * 1000
+    inference_count += 1
+    if inference_count == 1 or inference_count % 25 == 0:
+        print(
+            f"YOLO inference request={inference_count} "
+            f"image={image_width}x{image_height} "
+            f"inferenceMs={inference_ms:.1f} totalMs={total_ms:.1f} "
+            f"detections={len(detections)}"
         )
 
     return {
         "imageWidth": image_width,
         "imageHeight": image_height,
         "detections": detections,
+        "inferenceMs": round(inference_ms, 1),
+        "totalMs": round(total_ms, 1),
     }

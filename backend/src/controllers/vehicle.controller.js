@@ -133,6 +133,8 @@ const getLiveDetection = async (req, res, next) => {
         timestamp,
         imageWidth: result.imageWidth,
         imageHeight: result.imageHeight,
+        inferenceMs: result.inferenceMs,
+        totalMs: result.totalMs,
         detections: result.detections,
       };
 
@@ -154,6 +156,8 @@ const getLiveDetection = async (req, res, next) => {
             status: 'ACTIVE',
             imageWidth: result.imageWidth,
             imageHeight: result.imageHeight,
+            inferenceMs: result.inferenceMs,
+            totalMs: result.totalMs,
             detections: result.detections,
             nextFrameInMs: interval,
           },

@@ -9,6 +9,7 @@ const createConnection = (vehicleId) => {
     vehicleConnections.set(vehicleId, {
       controllerSocket: null,
       deviceSocket: null,
+      cameraSocket: null,
     });
   }
 
@@ -39,6 +40,22 @@ const setDeviceSocket = (vehicleId, socket) => {
   const connection = createConnection(vehicleId);
 
   connection.deviceSocket = socket;
+};
+
+const setCameraSocket = (vehicleId, socket) => {
+  const connection = createConnection(vehicleId);
+  connection.cameraSocket = socket;
+};
+
+const getCameraSocket = (vehicleId) =>
+  vehicleConnections.get(vehicleId)?.cameraSocket || null;
+
+const removeCameraSocket = (vehicleId, socket) => {
+  const connection = vehicleConnections.get(vehicleId);
+  if (!connection || connection.cameraSocket !== socket) return false;
+  connection.cameraSocket = null;
+  cleanupConnection(vehicleId);
+  return true;
 };
 
 /*
@@ -139,7 +156,7 @@ const cleanupConnection = (vehicleId) => {
     return;
   }
 
-  if (!connection.controllerSocket && !connection.deviceSocket) {
+  if (!connection.controllerSocket && !connection.deviceSocket && !connection.cameraSocket) {
     vehicleConnections.delete(vehicleId);
   }
 };
@@ -154,4 +171,7 @@ export {
   hasActiveDevice,
   removeControllerSocket,
   removeDeviceSocket,
+  setCameraSocket,
+  getCameraSocket,
+  removeCameraSocket,
 };

@@ -3,6 +3,7 @@ import {
   removeControllerSocket,
   getDeviceSocket,
   hasActiveController,
+  getCameraSocket,
 } from './websocket.manager.js';
 
 import VEHICLE_COMMAND from '../constants/vehicleCommand.constant.js';
@@ -42,6 +43,12 @@ const handleVehicleSocket = (socket, vehicle) => {
       message: 'Controller connected successfully',
     })
   );
+
+  socket.send(JSON.stringify({
+    type: 'CAMERA_STATUS',
+    vehicleId,
+    status: getCameraSocket(vehicleId)?.cameraHasFrame ? 'online' : 'connecting',
+  }));
 
   socket.send(
     JSON.stringify({

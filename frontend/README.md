@@ -17,7 +17,7 @@ If you are developing a production application, we recommend using TypeScript wi
 
 ## APEX device configuration
 
-Copy `.env.example` to `.env` and configure the API, dashboard WebSocket, and map provider values. Set `VITE_CAMERA_WS_URL` to the ESP32-CAM binary JPEG WebSocket URL (for example, `ws://<camera-host>:81`). Leave it unset when the camera is not configured; the dashboard will report that the camera is unavailable.
+Copy `.env.example` to `.env` and configure the API, dashboard WebSocket, and map provider values. The dashboard receives camera frames through the authenticated backend WebSocket; do not point the browser directly at the ESP32-CAM.
 
 The backend and firmware must use the same `DEVICE_TOKEN`. Configure it only in the ignored [backend `.env`](../backend/.env) and a local copy of [firmware_secrets.example.h](../esp32/firmware/firmware_secrets.example.h) saved as `esp32/firmware/APEX_ESP32_Firmware/firmware_secrets.h`. Both ESP32 sketches read the main rover sketch's local secrets file. Never commit local credential files.
 

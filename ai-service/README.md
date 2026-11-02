@@ -5,6 +5,13 @@ authenticated APEX backend. It uses the small COCO-pretrained `yolo11n.pt`
 model by default. The weights are downloaded to `~/.cache/apex/yolo11n.pt` on
 first start; model weights are not stored in this repository.
 
+The APEX benchmark on the available CPU used the same 810x1080 JPEG and
+`imgsz=640`: `yolo11n.pt` had a 46.3 ms median inference time (about 21.6
+FPS), while `yolo11s.pt` had an 83.1 ms median (about 12 FPS) with the same
+classes detected. APEX therefore keeps `yolo11n.pt` for the responsive live
+camera path. Re-run the benchmark on a different deployment before changing
+the model.
+
 ## Install and run (Windows PowerShell)
 
 Use Python 3.12 for compatibility with the PyTorch/Ultralytics runtime:
@@ -40,6 +47,26 @@ YOLO_ENABLED=true
 YOLO_CONFIDENCE_THRESHOLD=0.50
 YOLO_DETECTION_FPS=5
 ```
+
+The AI service also accepts:
+
+```dotenv
+YOLO_MODEL=yolo11n.pt
+YOLO_IMAGE_SIZE=640
+YOLO_DEVICE=
+```
+
+`YOLO_DEVICE` is empty for automatic selection, `cuda:0` when CUDA is
+available, or CPU otherwise. Increasing `YOLO_IMAGE_SIZE` can improve
+small-object recall at the cost of latency.
+
+The pretrained COCO model can confuse visually similar classes such as
+bottles and umbrellas. The service uses the model's own `result.names`
+mapping and does not swap class IDs. For reliable APEX-specific
+classification, collect labeled JPEGs for bottles, umbrellas, and the
+expected rover environment, split them into train/validation sets, and
+fine-tune an Ultralytics model. Set `YOLO_MODEL` to the resulting weights only
+after validating precision and latency on representative camera frames.
 
 If the AI service is reachable beyond the local machine, configure the same
 long random `AI_SERVICE_TOKEN` in both the backend and this service environment.

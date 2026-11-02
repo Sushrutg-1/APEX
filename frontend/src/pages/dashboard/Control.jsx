@@ -222,7 +222,8 @@ function Control() {
   };
 
   const takeSnapshot = async () => {
-    const frame = cameraService.getLatestFrame();
+    const capture = cameraService.getLatestCapture();
+    const frame = capture.frame;
     if (!frame) {
       setSnapshotStatus('Camera frame unavailable');
       return;

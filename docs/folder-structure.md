@@ -1,10 +1,13 @@
 # File Tree: APEX
 
-**Generated:** 9/26/2026, 10:21:37 AM
+**Generated:** 10/7/2026, 3:13:53 PM
 **Root Path:** `s:\Sushrut-Gondane\03-Projects\IoT\Project_1_APEX\APEX`
 
 ```
 ├── 📁 ai-service
+│   ├── 📝 README.md
+│   ├── 🐍 main.py
+│   └── 📄 requirements.txt
 ├── 📁 backend
 │   ├── 📁 src
 │   │   ├── 📁 config
@@ -14,21 +17,26 @@
 │   │   │   ├── 📄 httpStatus.constant.js
 │   │   │   └── 📄 vehicleCommand.constant.js
 │   │   ├── 📁 controllers
-│   │   │   └── 📄 auth.controller.js
+│   │   │   ├── 📄 auth.controller.js
+│   │   │   └── 📄 vehicle.controller.js
 │   │   ├── 📁 db
 │   │   │   └── 📄 db.js
 │   │   ├── 📁 middlewares
 │   │   │   ├── 📄 auth.middleware.js
 │   │   │   └── 📄 errorHandler.middleware.js
 │   │   ├── 📁 models
+│   │   │   ├── 📄 Event.model.js
+│   │   │   ├── 📄 Snapshot.model.js
 │   │   │   ├── 📄 User.model.js
 │   │   │   └── 📄 Vehicle.model.js
 │   │   ├── 📁 routes
 │   │   │   ├── 📄 auth.routes.js
-│   │   │   └── 📄 test.routes.js
+│   │   │   ├── 📄 test.routes.js
+│   │   │   └── 📄 vehicle.routes.js
 │   │   ├── 📁 scripts
 │   │   │   └── 📄 seed.js
 │   │   ├── 📁 services
+│   │   │   └── 📄 yolo.service.js
 │   │   ├── 📁 utils
 │   │   │   ├── 📄 ApiError.js
 │   │   │   └── 📄 ApiResponse.js
@@ -43,16 +51,53 @@
 │   ├── ⚙️ package.json
 │   └── ⚙️ pnpm-lock.yaml
 ├── 📁 docs
+│   ├── 📝 API.md
+│   ├── 📝 ARCHITECTURE.md
+│   ├── 📝 DATABASE.md
+│   └── 📝 ENVIRONMENT.md
 ├── 📁 esp32
 │   └── 📁 firmware
+│       ├── 📁 APEX_ESP32_CAM
+│       │   └── 📄 APEX_ESP32_CAM.ino
+│       ├── 📁 APEX_ESP32_Firmware
+│       │   └── 📄 APEX_ESP32_Firmware.ino
+│       └── ⚡ firmware_secrets.example.h
 ├── 📁 frontend
 │   ├── 📁 public
+│   │   ├── 📁 brand
+│   │   │   ├── 📝 APEX_Visual_Asset_Plan.md
+│   │   │   ├── 🖼️ app-icon.svg
+│   │   │   ├── 🖼️ favicon.svg
+│   │   │   ├── 🖼️ logo-dark.svg
+│   │   │   ├── 🖼️ logo-horizontal.svg
+│   │   │   ├── 🖼️ logo-mark-black.svg
+│   │   │   ├── 🖼️ logo-mark-dark.svg
+│   │   │   ├── 🖼️ logo-mark-white.svg
+│   │   │   ├── 🖼️ logo-mark.svg
+│   │   │   ├── 🖼️ logo.svg
+│   │   │   └── 🖼️ wordmark.svg
+│   │   └── 📁 illustrations
+│   │       ├── 📁 authentication
+│   │       │   ├── 🖼️ login-illustration.svg
+│   │       │   └── 🖼️ signup-illustration.svg
+│   │       ├── 📁 errors
+│   │       │   └── 🖼️ error-404.svg
+│   │       └── 📁 features
+│   │           ├── 🖼️ feature-event-detection.svg
+│   │           ├── 🖼️ feature-gps-tracking.svg
+│   │           ├── 🖼️ feature-live-camera.svg
+│   │           ├── 🖼️ feature-live-monitoring.svg
+│   │           ├── 🖼️ feature-remote-control.svg
+│   │           └── 🖼️ feature-snapshot-history.svg
 │   ├── 📁 src
 │   │   ├── 📁 app
 │   │   │   └── 📄 AppProvider.jsx
 │   │   ├── 📁 components
 │   │   │   ├── 📁 layout
+│   │   │   │   ├── 📄 LandingNavbar.jsx
+│   │   │   │   ├── 🎨 Navbar.css
 │   │   │   │   ├── 📄 Navbar.jsx
+│   │   │   │   ├── 🎨 Sidebar.css
 │   │   │   │   └── 📄 Sidebar.jsx
 │   │   │   └── 📁 ui
 │   │   │       ├── 📄 Button.jsx
@@ -67,8 +112,13 @@
 │   │   │   └── 📄 vehicleCommand.constant.js
 │   │   ├── 📁 features
 │   │   │   ├── 📁 camera
+│   │   │   │   ├── 🎨 CameraFeed.css
+│   │   │   │   ├── 📄 CameraFeed.jsx
+│   │   │   │   └── 📄 camera.service.js
 │   │   │   ├── 📁 history
 │   │   │   ├── 📁 map
+│   │   │   │   ├── 🎨 Map.css
+│   │   │   │   └── 📄 Map.jsx
 │   │   │   ├── 📁 rover
 │   │   │   └── 📁 telemetry
 │   │   ├── 📁 layout
@@ -78,10 +128,15 @@
 │   │   │   │   ├── 📄 Login.jsx
 │   │   │   │   └── 📄 Signup.jsx
 │   │   │   ├── 📁 dashboard
+│   │   │   │   ├── 🎨 Control.css
 │   │   │   │   ├── 📄 Control.jsx
+│   │   │   │   ├── 📄 Events.jsx
 │   │   │   │   ├── 📄 History.jsx
-│   │   │   │   └── 📄 Home.jsx
+│   │   │   │   ├── 🎨 Home.css
+│   │   │   │   ├── 📄 Home.jsx
+│   │   │   │   └── 📄 Snapshots.jsx
 │   │   │   └── 📁 landing
+│   │   │       └── 📄 Landing.jsx
 │   │   ├── 📁 redux
 │   │   │   ├── 📁 reducers
 │   │   │   └── 📁 slices
@@ -92,12 +147,16 @@
 │   │   │   └── 📄 ProtectedRoute.jsx
 │   │   ├── 📁 services
 │   │   │   ├── 📄 api.service.js
+│   │   │   ├── 📄 weather.service.js
 │   │   │   └── 📄 websocket.service.js
 │   │   ├── 📁 store
 │   │   │   └── 📄 store.js
 │   │   ├── 📁 styles
+│   │   │   ├── 🎨 auth.css
+│   │   │   ├── 🎨 dashboard-layout.css
 │   │   │   └── 🎨 global.css
 │   │   ├── 📁 utils
+│   │   │   └── 📄 geography.js
 │   │   ├── 📄 App.jsx
 │   │   └── 📄 main.jsx
 │   ├── ⚙️ .gitignore

@@ -4,20 +4,44 @@ import env from '../config/env.config.js';
 import Vehicle from '../models/Vehicle.model.js';
 import handleVehicleSocket from './vehicle.socket.js';
 import handleDeviceSocket from "./device.socket.js";
+import handleCameraSocket from './camera.socket.js';
 
 const createWebSocketServer = (server) => {
   const wss = new WebSocketServer({
-    server,
+    noServer: true,
     perMessageDeflate: false,
-
     handleProtocols: () => {
       return false;
     },
   });
 
+  server.on('upgrade', (request, socket, head) => {
+    const upgrade = request.headers.upgrade;
+    const connection = request.headers.connection;
+
+    if (!upgrade || !/websocket/i.test(String(upgrade)) || !connection || !/upgrade/i.test(String(connection))) {
+      socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
+      socket.destroy();
+      return;
+    }
+
+    wss.handleUpgrade(request, socket, head, (ws) => {
+      wss.emit('connection', ws, request);
+    });
+  });
+
   wss.on('connection', async (socket, request) => {
+    let receivedMessage = false;
     socket.on('error', (error) => {
-      console.error('WebSocket error:', error.message);
+      console.error(
+        `[WS ERROR] ${request.method} ${request.url} remote=${request.socket.remoteAddress || 'unknown'} ` +
+        `phase=${receivedMessage ? 'after-message' : 'before-message'} ` +
+        `extensions=${request.headers['sec-websocket-extensions'] || 'none'} ` +
+        `code=${error.code || 'none'}: ${error.message}`
+      );
+    });
+    socket.on('message', () => {
+      receivedMessage = true;
     });
 
     try {
@@ -25,6 +49,10 @@ const createWebSocketServer = (server) => {
 
       // ESP32 device connection
       if (deviceId) {
+        console.log(
+          `[WS CONNECT] device=${deviceId} type=${request.headers['x-device-type'] || 'default'} ` +
+          `url=${request.url} extensions=${request.headers['sec-websocket-extensions'] || 'none'}`
+        );
         await authenticateDevice(socket, request);
         return;
       }
@@ -114,6 +142,11 @@ const authenticateDevice = async (socket, request) => {
     vehicleId: vehicle.vehicleId,
     name: vehicle.name,
   };
+
+  if (request.headers['x-device-type'] === 'camera') {
+    handleCameraSocket(socket, vehicle);
+    return;
+  }
 
   await Vehicle.updateOne(
     { _id: vehicle._id },

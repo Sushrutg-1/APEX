@@ -2,9 +2,10 @@ import env from '../config/env.config.js';
 
 const MAX_DETECTIONS = 100;
 const AI_REQUEST_TIMEOUT_MS = 15000;
+let inferenceCount = 0;
 
 const validateDetectionResponse = (response) => {
-  const { imageWidth, imageHeight, detections } = response || {};
+  const { imageWidth, imageHeight, detections, inferenceMs, totalMs } = response || {};
 
   if (
     !Number.isInteger(imageWidth) ||
@@ -48,7 +49,13 @@ const validateDetectionResponse = (response) => {
     };
   });
 
-  return { imageWidth, imageHeight, detections: validatedDetections };
+  return {
+    imageWidth,
+    imageHeight,
+    detections: validatedDetections,
+    inferenceMs: Number.isFinite(inferenceMs) ? inferenceMs : null,
+    totalMs: Number.isFinite(totalMs) ? totalMs : null,
+  };
 };
 
 const getDetectionEndpoint = () => {
@@ -57,6 +64,22 @@ const getDetectionEndpoint = () => {
     : `${env.AI_SERVICE_URL}/`;
 
   return new URL('detect', baseUrl);
+};
+
+const getServiceUnavailableReason = (error, endpoint) => {
+  if (error?.name === 'AbortError') {
+    return 'AI service request timed out';
+  }
+
+  if (error?.name === 'TypeError' && error?.message === 'fetch failed') {
+    return `AI service is unavailable at ${endpoint.origin}`;
+  }
+
+  if (/^AI service returned HTTP \d+$/.test(error?.message || '')) {
+    return error.message;
+  }
+
+  return 'AI service request failed or returned invalid data';
 };
 
 const runYoloInference = async (image, { busyRetries = 0 } = {}) => {
@@ -70,12 +93,13 @@ const runYoloInference = async (image, { busyRetries = 0 } = {}) => {
     headers['x-ai-service-token'] = env.AI_SERVICE_TOKEN;
   }
 
+  const endpoint = getDetectionEndpoint();
+
   for (let attempt = 0; attempt <= busyRetries; attempt += 1) {
     const abortController = new AbortController();
     const timeout = setTimeout(() => abortController.abort(), AI_REQUEST_TIMEOUT_MS);
 
     try {
-      const endpoint = getDetectionEndpoint();
       endpoint.searchParams.set(
         'confidence',
         String(env.YOLO_CONFIDENCE_THRESHOLD)
@@ -87,6 +111,14 @@ const runYoloInference = async (image, { busyRetries = 0 } = {}) => {
         body: image,
         signal: abortController.signal,
       });
+
+      inferenceCount += 1;
+      if (inferenceCount === 1 || inferenceCount % 25 === 0) {
+        console.debug(
+          `YOLO response request=${inferenceCount} status=${response.status} ` +
+            `contentType=${response.headers.get('content-type') || 'unknown'}`
+        );
+      }
 
       if (response.status === 429) {
         await response.body?.cancel();
@@ -101,14 +133,22 @@ const runYoloInference = async (image, { busyRetries = 0 } = {}) => {
         throw new Error(`AI service returned HTTP ${response.status}`);
       }
 
-      return validateDetectionResponse(await response.json());
+      const result = validateDetectionResponse(await response.json());
+      if (inferenceCount === 1 || inferenceCount % 25 === 0) {
+        const firstDetection = result.detections[0];
+        console.debug(
+          `YOLO parsed request=${inferenceCount} detections=${result.detections.length}` +
+            (firstDetection
+              ? ` first=${firstDetection.className} confidence=${firstDetection.confidence.toFixed(
+                  3
+                  )} box=${firstDetection.x},${firstDetection.y},${firstDetection.width},${firstDetection.height}` +
+                  ` inferenceMs=${result.inferenceMs ?? 'unknown'} totalMs=${result.totalMs ?? 'unknown'}`
+              : '')
+        );
+      }
+      return result;
     } catch (error) {
-      const reason =
-        error.name === 'AbortError'
-          ? 'AI service request timed out'
-          : /^AI service returned HTTP \d+$/.test(error.message)
-            ? error.message
-            : 'AI service request failed or returned invalid data';
+      const reason = getServiceUnavailableReason(error, endpoint);
       console.error('YOLO inference is unavailable:', reason);
       return null;
     } finally {

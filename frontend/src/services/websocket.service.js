@@ -89,6 +89,16 @@ const connect = () => {
       return;
     }
 
+    if (event.data instanceof Blob || event.data instanceof ArrayBuffer) {
+      console.debug(
+        `Received binary dashboard WebSocket frame: ${
+          event.data.byteLength ?? event.data.size
+        } bytes`
+      );
+      notify({ type: 'CAMERA_FRAME', frame: event.data });
+      return;
+    }
+
     try {
       const data = JSON.parse(event.data);
 
@@ -112,7 +122,7 @@ const connect = () => {
     });
   };
 
-  activeSocket.onclose = () => {
+  activeSocket.onclose = (event) => {
     if (socket !== activeSocket) {
       return;
     }
@@ -121,7 +131,12 @@ const connect = () => {
 
     notify({
       type: 'WS_CLOSE',
+      code: event.code,
+      reason: event.reason || 'No close reason provided',
     });
+    console.warn(
+      `Dashboard WebSocket closed: code=${event.code} reason=${event.reason || 'none'}`
+    );
 
     if (!manuallyClosed && listeners.size > 0) {
       clearTimeout(reconnectTimer);
