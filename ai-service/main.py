@@ -124,30 +124,71 @@ def get_person_confidence() -> float:
     return configured_threshold
 
 
+def load_model(model_path: Path) -> YOLO:
+    return YOLO(str(model_path))
+
+
+def warmup_model(model: YOLO, device: str, image_size: int) -> None:
+    model.predict(
+        source=Image.new("RGB", (640, 640)),
+        conf=0.5,
+        max_det=1,
+        imgsz=image_size,
+        device=device,
+        verbose=False,
+    )
+
+
+async def warmup_after_startup(app: FastAPI) -> None:
+    started_at = time.perf_counter()
+    print("YOLO warmup started")
+    try:
+        await run_in_threadpool(
+            warmup_model,
+            app.state.model,
+            app.state.device,
+            app.state.image_size,
+        )
+        app.state.inference_ready = True
+        elapsed_ms = (time.perf_counter() - started_at) * 1000
+        print(f"YOLO warmup completed in {elapsed_ms:.1f}ms")
+    except asyncio.CancelledError:
+        print("YOLO warmup cancelled during shutdown")
+        raise
+    except Exception as error:
+        app.state.inference_ready = False
+        print(f"YOLO warmup failed: {error}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     model_path = Path(os.getenv("YOLO_MODEL") or "yolo11n.pt").expanduser()
     if not model_path.is_absolute() and model_path.parent == Path("."):
         model_path = Path.home() / ".cache" / "apex" / model_path.name
     model_path.parent.mkdir(parents=True, exist_ok=True)
-    app.state.model = YOLO(str(model_path))
+    app.state.model = None
+    app.state.inference_ready = False
     app.state.device = get_inference_device()
     app.state.image_size = get_image_size()
     app.state.person_confidence = get_person_confidence()
-    app.state.model.predict(
-        source=Image.new("RGB", (640, 640)),
-        conf=0.5,
-        max_det=1,
-        imgsz=app.state.image_size,
-        device=app.state.device,
-        verbose=False,
-    )
     print(
-        f"YOLO model loaded: {model_path.name} device={app.state.device} "
-        f"imgsz={app.state.image_size} personConf={app.state.person_confidence} warmed=true"
+        f"YOLO model initialization started: {model_path.name} "
+        f"device={app.state.device} imgsz={app.state.image_size} "
+        f"personConf={app.state.person_confidence}"
     )
+    app.state.model = await run_in_threadpool(load_model, model_path)
+    print(
+        f"YOLO model loaded: {model_path.name}; startup warmup deferred"
+    )
+    warmup_task = asyncio.create_task(warmup_after_startup(app))
     yield
+    warmup_task.cancel()
+    try:
+        await warmup_task
+    except asyncio.CancelledError:
+        pass
     app.state.model = None
+    app.state.inference_ready = False
 
 
 app = FastAPI(title="APEX YOLO Inference", lifespan=lifespan)
@@ -158,7 +199,11 @@ def is_model_loaded() -> bool:
 
 
 def can_accept_inference() -> bool:
-    return is_model_loaded() and not inference_lock.locked()
+    return (
+        is_model_loaded()
+        and getattr(app.state, "inference_ready", False)
+        and not inference_lock.locked()
+    )
 
 
 async def read_jpeg(request: Request) -> bytes:
@@ -320,6 +365,8 @@ async def detect(
 
     if inference_lock.locked():
         raise HTTPException(status_code=429, detail="Inference is busy")
+    if not is_model_loaded() or not getattr(app.state, "inference_ready", False):
+        raise HTTPException(status_code=503, detail="Inference service is not ready")
 
     global inference_count
     request_started_at = time.perf_counter()
