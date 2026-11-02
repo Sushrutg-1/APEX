@@ -17,6 +17,7 @@ function CameraFeed({
   const currentUrl = useRef(null);
   const currentFrameId = useRef(0);
   const displayedFrameId = useRef(0);
+  const detectionFrameId = useRef(0);
 
   useEffect(() => {
     const displayFrame = (frame, frameId) => {
@@ -48,15 +49,24 @@ function CameraFeed({
         Number.isInteger(message.imageHeight) &&
         Array.isArray(message.detections)
       ) {
-        currentFrameId.current = message.frameId;
+        if (message.frameId < currentFrameId.current) {
+          console.debug(
+            `Ignoring stale detection frame=${message.frameId} current=${currentFrameId.current}`
+          );
+          return;
+        }
         displayFrame(message.frame, message.frameId);
         setDetectionStatus('ACTIVE');
         setDetection({
           frameId: message.frameId,
           imageWidth: message.imageWidth,
           imageHeight: message.imageHeight,
+          inferenceMs: message.inferenceMs,
+          trackingMs: message.trackingMs,
+          frontendRequestMs: message.frontendRequestMs,
           detections: message.detections,
         });
+        detectionFrameId.current = message.frameId;
         console.debug(
           `YOLO overlay received frame=${message.frameId} boxes=${message.detections.length}`
         );
@@ -95,6 +105,9 @@ function CameraFeed({
 
       if (message.type === 'FRAME') {
         currentFrameId.current = message.frameId;
+        if (message.frameId > detectionFrameId.current) {
+          setDetection(null);
+        }
         if (!displayedFrameId.current) {
           displayFrame(message.frame, message.frameId);
         }

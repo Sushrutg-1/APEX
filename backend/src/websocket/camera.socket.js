@@ -4,6 +4,7 @@ import {
   removeCameraSocket,
   setCameraSocket,
 } from './websocket.manager.js';
+import { resetYoloTracker } from '../services/yolo.service.js';
 
 const OPEN = 1;
 const FRAME_TIMEOUT_MS = 5000;
@@ -98,6 +99,7 @@ const handleCameraSocket = (socket, vehicle) => {
     );
     if (removeCameraSocket(vehicleId, socket)) {
       frameCounters.delete(vehicleId);
+      void resetYoloTracker(vehicleId);
       notifyController(vehicleId, 'offline');
     }
   });

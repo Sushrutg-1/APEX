@@ -2,14 +2,18 @@ import asyncio
 import hmac
 import io
 import os
+import threading
 import time
 from contextlib import asynccontextmanager
+from types import SimpleNamespace
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from PIL import Image, UnidentifiedImageError
 from starlette.concurrency import run_in_threadpool
 import torch
+from ultralytics.engine.results import Boxes
+from ultralytics.trackers.byte_tracker import BYTETracker
 from ultralytics import YOLO
 from dotenv import load_dotenv
 
@@ -18,12 +22,88 @@ load_dotenv()
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
 MAX_IMAGE_PIXELS = 25_000_000
 MAX_DETECTIONS = 100
+PERSON_CLASS_ID = 0
 inference_lock = asyncio.Lock()
 inference_count = 0
+tracker_states = {}
+tracker_lock = threading.Lock()
+
+
+def create_tracker() -> BYTETracker:
+    return BYTETracker(
+        SimpleNamespace(
+            track_high_thresh=float(os.getenv("TRACK_HIGH_THRESHOLD", "0.25")),
+            track_low_thresh=float(os.getenv("TRACK_LOW_THRESHOLD", "0.1")),
+            new_track_thresh=float(os.getenv("TRACK_NEW_THRESHOLD", "0.25")),
+            track_buffer=int(os.getenv("TRACK_BUFFER", "30")),
+            match_thresh=float(os.getenv("TRACK_MATCH_THRESHOLD", "0.8")),
+            fuse_score=os.getenv("TRACK_FUSE_SCORE", "true").lower() == "true",
+        )
+    )
+
+
+def get_tracker(camera_id: str) -> BYTETracker:
+    with tracker_lock:
+        idle_timeout = float(os.getenv("TRACKER_IDLE_TIMEOUT_SECONDS", "300"))
+        now = time.monotonic()
+        for stale_id, state in list(tracker_states.items()):
+            if now - state["last_used_at"] > idle_timeout:
+                tracker_states.pop(stale_id, None)
+        state = tracker_states.get(camera_id)
+        if state is None:
+            state = {"tracker": create_tracker(), "last_used_at": now}
+            tracker_states[camera_id] = state
+        state["last_used_at"] = now
+        return state["tracker"]
+
+
+def reset_tracker(camera_id: str) -> None:
+    with tracker_lock:
+        tracker_states.pop(camera_id, None)
+
+
+def apply_tracking(
+    detections: list[dict],
+    camera_id: str,
+    image_width: int,
+    image_height: int,
+) -> list[dict]:
+    tracker = get_tracker(camera_id)
+    values = [
+        [
+            item["x"],
+            item["y"],
+            item["x"] + item["width"],
+            item["y"] + item["height"],
+            item["confidence"],
+            item["classId"],
+        ]
+        for item in detections
+    ]
+    boxes = Boxes(
+        torch.tensor(values, dtype=torch.float32).reshape(-1, 6),
+        (image_height, image_width),
+    )
+    tracked = tracker.update(boxes.cpu().numpy())
+    tracked_detections = []
+    for row in tracked:
+        left, top, right, bottom, track_id, _, _, index = row[:8]
+        source = detections[int(index)]
+        tracked_detections.append(
+            {
+                **{key: value for key, value in source.items() if key != "classId"},
+                "x": max(0.0, float(left)),
+                "y": max(0.0, float(top)),
+                "width": max(0.0, min(float(right), image_width) - max(float(left), 0.0)),
+                "height": max(0.0, min(float(bottom), image_height) - max(float(top), 0.0)),
+                "trackId": int(track_id),
+            }
+        )
+    return [item for item in tracked_detections if item["width"] > 0 and item["height"] > 0]
 
 
 def get_image_size() -> int:
-    configured_size = int(os.getenv("YOLO_IMAGE_SIZE", "640"))
+    configured_size = int(os.getenv("YOLO_IMAGE_SIZE", "512"))
     if configured_size < 320 or configured_size > 1280:
         raise ValueError("YOLO_IMAGE_SIZE must be between 320 and 1280")
     return configured_size
@@ -36,6 +116,13 @@ def get_inference_device() -> str:
     return "cuda:0" if torch.cuda.is_available() else "cpu"
 
 
+def get_person_confidence() -> float:
+    configured_threshold = float(os.getenv("PERSON_CONFIDENCE_THRESHOLD", "0.35"))
+    if configured_threshold < 0 or configured_threshold > 1:
+        raise ValueError("PERSON_CONFIDENCE_THRESHOLD must be between 0 and 1")
+    return configured_threshold
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     model_path = Path(os.getenv("YOLO_MODEL") or "yolo11n.pt").expanduser()
@@ -45,6 +132,7 @@ async def lifespan(app: FastAPI):
     app.state.model = YOLO(str(model_path))
     app.state.device = get_inference_device()
     app.state.image_size = get_image_size()
+    app.state.person_confidence = get_person_confidence()
     app.state.model.predict(
         source=Image.new("RGB", (640, 640)),
         conf=0.5,
@@ -55,7 +143,7 @@ async def lifespan(app: FastAPI):
     )
     print(
         f"YOLO model loaded: {model_path.name} device={app.state.device} "
-        f"imgsz={app.state.image_size} warmed=true"
+        f"imgsz={app.state.image_size} personConf={app.state.person_confidence} warmed=true"
     )
     yield
     app.state.model = None
@@ -99,12 +187,13 @@ def get_detections(
     confidence: float,
     device: str,
     image_size: int,
+    person_confidence: float,
 ) -> tuple[list[dict], float]:
     started_at = time.perf_counter()
     with torch.inference_mode():
         results = model.predict(
             source=image,
-            conf=confidence,
+            conf=min(confidence, person_confidence),
             max_det=MAX_DETECTIONS,
             imgsz=image_size,
             device=device,
@@ -123,6 +212,11 @@ def get_detections(
     names = result.names
 
     for coordinates, class_id, score in zip(boxes, class_ids, confidences):
+        minimum_confidence = (
+            person_confidence if int(class_id) == PERSON_CLASS_ID else confidence
+        )
+        if score < minimum_confidence:
+            continue
         left, top, right, bottom = coordinates
         x = max(0.0, min(float(left), float(image.width)))
         y = max(0.0, min(float(top), float(image.height)))
@@ -135,6 +229,7 @@ def get_detections(
         detections.append(
             {
                 "className": str(names[int(class_id)]),
+                "classId": int(class_id),
                 "confidence": float(score),
                 "x": x,
                 "y": y,
@@ -148,13 +243,17 @@ def get_detections(
 
 @app.get("/health-check")
 async def health_check():
-    return {"status": "ok", "modelLoaded": getattr(app.state, "model", None) is not None}
+    return {
+        "status": "ok",
+        "modelLoaded": getattr(app.state, "model", None) is not None,
+        "activeTrackers": len(tracker_states),
+    }
 
 
 @app.post("/detect")
 async def detect(
     request: Request,
-    confidence: float = Query(default=0.5, ge=0.0, le=1.0),
+    confidence: float = Query(default=0.35, ge=0.0, le=1.0),
 ):
     expected_token = os.getenv("AI_SERVICE_TOKEN", "")
     supplied_token = request.headers.get("x-ai-service-token", "")
@@ -162,6 +261,9 @@ async def detect(
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     image_bytes = await read_jpeg(request)
+    camera_id = request.headers.get("x-camera-id", "default").strip()
+    if not camera_id or len(camera_id) > 100:
+        raise HTTPException(status_code=400, detail="Invalid x-camera-id")
 
     try:
         with Image.open(io.BytesIO(image_bytes)) as image:
@@ -188,14 +290,24 @@ async def detect(
             confidence,
             app.state.device,
             app.state.image_size,
+            app.state.person_confidence,
         )
+        tracking_started_at = time.perf_counter()
+        detections = await run_in_threadpool(
+            apply_tracking,
+            detections,
+            camera_id,
+            image_width,
+            image_height,
+        )
+        tracking_ms = (time.perf_counter() - tracking_started_at) * 1000
     total_ms = (time.perf_counter() - request_started_at) * 1000
     inference_count += 1
     if inference_count == 1 or inference_count % 25 == 0:
         print(
             f"YOLO inference request={inference_count} "
             f"image={image_width}x{image_height} "
-            f"inferenceMs={inference_ms:.1f} totalMs={total_ms:.1f} "
+            f"inferenceMs={inference_ms:.1f} trackingMs={tracking_ms:.1f} totalMs={total_ms:.1f} "
             f"detections={len(detections)}"
         )
 
@@ -204,5 +316,16 @@ async def detect(
         "imageHeight": image_height,
         "detections": detections,
         "inferenceMs": round(inference_ms, 1),
+        "trackingMs": round(tracking_ms, 1),
         "totalMs": round(total_ms, 1),
     }
+
+
+@app.delete("/trackers/{camera_id}")
+async def delete_tracker(camera_id: str, request: Request):
+    expected_token = os.getenv("AI_SERVICE_TOKEN", "")
+    supplied_token = request.headers.get("x-ai-service-token", "")
+    if expected_token and not hmac.compare_digest(supplied_token, expected_token):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    reset_tracker(camera_id)
+    return {"status": "ok"}

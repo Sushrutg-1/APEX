@@ -25,6 +25,8 @@ const seed = async () => {
 
     // Create user
     const user = await User.create({
+      fullName: 'APEX Administrator',
+      email: 'admin@apex.local',
       username: 'admin',
       passwordHash,
       vehicleId: 'APEX-01',

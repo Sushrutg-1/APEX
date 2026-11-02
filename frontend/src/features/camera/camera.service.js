@@ -14,6 +14,8 @@ let activeDetectionRequest = null;
 let detectionRequestId = 0;
 let lastSuccessfulDetectionAt = 0;
 let detectionExpiryTimer = null;
+let replacedFrameCount = 0;
+let processedFrameCount = 0;
 const listeners = new Set();
 let unsubscribeSocket = null;
 const DETECTION_STALE_AFTER_MS = 15000;
@@ -60,6 +62,7 @@ const requestDetection = async (frame) => {
   pendingDetection = null;
   detectionInFlight = true;
   const requestId = ++detectionRequestId;
+  const requestStartedAt = performance.now();
   activeDetectionRequest = new AbortController();
   notify({
     type: 'DETECTION_STATUS',
@@ -70,10 +73,14 @@ const requestDetection = async (frame) => {
 
   try {
     const { data } = await api.post('/vehicles/me/detections', frame.image, {
-      headers: { 'Content-Type': 'image/jpeg' },
+      headers: {
+        'Content-Type': 'image/jpeg',
+        'X-Frame-Received-At': String(frame.receivedAt),
+      },
       signal: activeDetectionRequest.signal,
     });
     const result = data.data;
+    const resultReceivedAt = performance.now();
     nextDetectionAt =
       Date.now() + (Number.isFinite(result.nextFrameInMs) ? Math.max(100, result.nextFrameInMs) : 200);
 
@@ -85,7 +92,11 @@ const requestDetection = async (frame) => {
         imageWidth: result.imageWidth,
         imageHeight: result.imageHeight,
         inferenceMs: result.inferenceMs,
+        trackingMs: result.trackingMs,
+        frameAgeMs: result.frameAgeMs,
         totalMs: result.totalMs,
+        frontendRequestMs: performance.now() - requestStartedAt,
+        receivedAt: resultReceivedAt,
         detections: result.detections,
       };
       lastSuccessfulDetectionAt = Date.now();
@@ -96,6 +107,15 @@ const requestDetection = async (frame) => {
         }
       }, DETECTION_STALE_AFTER_MS);
       notify({ type: 'DETECTION', ...latestDetection });
+      processedFrameCount += 1;
+      if (processedFrameCount === 1 || processedFrameCount % 25 === 0) {
+        console.debug(
+          `Detection metrics received=${receivedFrameCount} processed=${processedFrameCount} ` +
+          `replaced=${replacedFrameCount} frameAgeMs=${Date.now() - frame.receivedAt} ` +
+          `backendFrameAgeMs=${result.frameAgeMs ?? 'unknown'} ` +
+          `requestMs=${(performance.now() - requestStartedAt).toFixed(1)}`
+        );
+      }
       if (latestDetection.detections.length > 0) {
         console.debug(
           `YOLO detections frame=${frameId} count=${latestDetection.detections.length} ` +
@@ -133,7 +153,10 @@ const requestDetection = async (frame) => {
 };
 
 const queueDetection = (image, frameId) => {
-  pendingDetection = { image, frameId };
+  if (pendingDetection) {
+    replacedFrameCount += 1;
+  }
+  pendingDetection = { image, frameId, receivedAt: Date.now() };
   void requestDetection(pendingDetection);
 };
 

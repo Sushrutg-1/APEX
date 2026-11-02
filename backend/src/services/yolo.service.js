@@ -5,7 +5,8 @@ const AI_REQUEST_TIMEOUT_MS = 15000;
 let inferenceCount = 0;
 
 const validateDetectionResponse = (response) => {
-  const { imageWidth, imageHeight, detections, inferenceMs, totalMs } = response || {};
+  const { imageWidth, imageHeight, detections, inferenceMs, trackingMs, frameAgeMs, totalMs } =
+    response || {};
 
   if (
     !Number.isInteger(imageWidth) ||
@@ -19,7 +20,7 @@ const validateDetectionResponse = (response) => {
   }
 
   const validatedDetections = detections.map((detection) => {
-    const { className, confidence, x, y, width, height } = detection || {};
+    const { className, confidence, x, y, width, height, trackId } = detection || {};
     const numericValues = [confidence, x, y, width, height];
 
     if (
@@ -35,6 +36,7 @@ const validateDetectionResponse = (response) => {
       height <= 0 ||
       x + width > imageWidth ||
       y + height > imageHeight
+      || (trackId !== undefined && (!Number.isInteger(trackId) || trackId < 1))
     ) {
       throw new Error('AI service returned invalid detection data');
     }
@@ -46,6 +48,7 @@ const validateDetectionResponse = (response) => {
       y,
       width,
       height,
+      ...(trackId === undefined ? {} : { trackId }),
     };
   });
 
@@ -54,6 +57,8 @@ const validateDetectionResponse = (response) => {
     imageHeight,
     detections: validatedDetections,
     inferenceMs: Number.isFinite(inferenceMs) ? inferenceMs : null,
+    trackingMs: Number.isFinite(trackingMs) ? trackingMs : null,
+    frameAgeMs: Number.isFinite(frameAgeMs) ? frameAgeMs : null,
     totalMs: Number.isFinite(totalMs) ? totalMs : null,
   };
 };
@@ -82,7 +87,7 @@ const getServiceUnavailableReason = (error, endpoint) => {
   return 'AI service request failed or returned invalid data';
 };
 
-const runYoloInference = async (image, { busyRetries = 0 } = {}) => {
+const runYoloInference = async (image, { busyRetries = 0, cameraId } = {}) => {
   if (!env.YOLO_ENABLED) {
     return null;
   }
@@ -91,6 +96,9 @@ const runYoloInference = async (image, { busyRetries = 0 } = {}) => {
 
   if (env.AI_SERVICE_TOKEN) {
     headers['x-ai-service-token'] = env.AI_SERVICE_TOKEN;
+  }
+  if (cameraId) {
+    headers['x-camera-id'] = cameraId;
   }
 
   const endpoint = getDetectionEndpoint();
@@ -159,4 +167,21 @@ const runYoloInference = async (image, { busyRetries = 0 } = {}) => {
   return { status: 'BUSY' };
 };
 
-export { runYoloInference };
+const resetYoloTracker = async (cameraId) => {
+  if (!env.YOLO_ENABLED || !cameraId) {
+    return;
+  }
+
+  const endpoint = new URL(`trackers/${encodeURIComponent(cameraId)}`, `${env.AI_SERVICE_URL.replace(/\/?$/, '/')}`);
+  const headers = env.AI_SERVICE_TOKEN
+    ? { 'x-ai-service-token': env.AI_SERVICE_TOKEN }
+    : {};
+
+  try {
+    await fetch(endpoint, { method: 'DELETE', headers });
+  } catch (error) {
+    console.warn(`Unable to reset YOLO tracker for ${cameraId}:`, error.message);
+  }
+};
+
+export { resetYoloTracker, runYoloInference };

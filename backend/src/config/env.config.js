@@ -69,11 +69,11 @@ const env = {
   YOLO_ENABLED: parseBoolean('YOLO_ENABLED', true),
   YOLO_CONFIDENCE_THRESHOLD: parseNumber(
     'YOLO_CONFIDENCE_THRESHOLD',
-    0.5,
+    0.35,
     0,
     1
   ),
-  YOLO_DETECTION_FPS: parseNumber('YOLO_DETECTION_FPS', 5, 1, 10),
+  YOLO_DETECTION_FPS: parseNumber('YOLO_DETECTION_FPS', 10, 1, 10),
 };
 
 export default env;

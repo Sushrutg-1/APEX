@@ -72,6 +72,7 @@ const getLiveDetection = async (req, res, next) => {
 
     const vehicle = await getOwnedVehicle(req);
     const state = getDetectionState(vehicle.vehicleId);
+    const frameReceivedAt = Number(req.get('x-frame-received-at'));
     const now = Date.now();
     const interval = getDetectionInterval();
     const remainingInterval = Math.max(0, state.lastRequestedAt + interval - now);
@@ -94,7 +95,7 @@ const getLiveDetection = async (req, res, next) => {
     state.lastRequestedAt = now;
 
     try {
-      const result = await runYoloInference(image);
+      const result = await runYoloInference(image, { cameraId: vehicle.vehicleId });
 
       if (result?.status === 'BUSY') {
         return res.status(HTTP_STATUS.OK).json(
@@ -127,6 +128,9 @@ const getLiveDetection = async (req, res, next) => {
       }
 
       const timestamp = new Date().toISOString();
+      const frameAgeMs = Number.isFinite(frameReceivedAt)
+        ? Math.max(0, Date.now() - frameReceivedAt)
+        : null;
       const detectionMessage = {
         type: 'OBJECT_DETECTION',
         vehicleId: vehicle.vehicleId,
@@ -134,6 +138,8 @@ const getLiveDetection = async (req, res, next) => {
         imageWidth: result.imageWidth,
         imageHeight: result.imageHeight,
         inferenceMs: result.inferenceMs,
+        trackingMs: result.trackingMs,
+        frameAgeMs,
         totalMs: result.totalMs,
         detections: result.detections,
       };
@@ -157,6 +163,8 @@ const getLiveDetection = async (req, res, next) => {
             imageWidth: result.imageWidth,
             imageHeight: result.imageHeight,
             inferenceMs: result.inferenceMs,
+            trackingMs: result.trackingMs,
+            frameAgeMs,
             totalMs: result.totalMs,
             detections: result.detections,
             nextFrameInMs: interval,
@@ -341,7 +349,10 @@ const createSnapshot = async (req, res, next) => {
       telemetry.gpsFix === true &&
       Number.isFinite(telemetry.latitude) &&
       Number.isFinite(telemetry.longitude);
-    const detection = await runYoloInference(image, { busyRetries: 8 });
+    const detection = await runYoloInference(image, {
+      busyRetries: 8,
+      cameraId: vehicle.vehicleId,
+    });
     const detectionAvailable = detection && detection.status !== 'BUSY';
 
     const snapshot = await Snapshot.create({

@@ -10,6 +10,7 @@ node_modules/
 .env
 .env.*
 !.env.example
+!.env.example.*
 
 # Build output
 dist/
@@ -22,6 +23,9 @@ out/
 # Logs
 *.log
 logs/
+uploads/
+snapshots/
+runtime/
 
 # Coverage
 coverage/
@@ -64,6 +68,7 @@ esp32/firmware/**/firmware_secrets.h
 *.elf
 *.hex
 *.map
+firmware/**/firmware_secrets.h
 
 # Local configuration
 *.local
@@ -76,6 +81,16 @@ esp32/firmware/**/firmware_secrets.h
 # Backup files
 *.backup
 *.old
+
+# Private keys, certificates, and model weights
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.pt
+*.onnx
+!firmware_secrets.example.h
 
 # ==========================================
 # END OF APEX GITIGNORE

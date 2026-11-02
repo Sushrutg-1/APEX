@@ -44,21 +44,34 @@ Set these in `backend/.env`:
 AI_SERVICE_URL=http://127.0.0.1:8000
 AI_SERVICE_TOKEN=
 YOLO_ENABLED=true
-YOLO_CONFIDENCE_THRESHOLD=0.50
-YOLO_DETECTION_FPS=5
+YOLO_CONFIDENCE_THRESHOLD=0.35
+YOLO_DETECTION_FPS=10
 ```
 
 The AI service also accepts:
 
 ```dotenv
 YOLO_MODEL=yolo11n.pt
-YOLO_IMAGE_SIZE=640
+YOLO_IMAGE_SIZE=512
 YOLO_DEVICE=
+PERSON_CONFIDENCE_THRESHOLD=0.35
 ```
 
 `YOLO_DEVICE` is empty for automatic selection, `cuda:0` when CUDA is
-available, or CPU otherwise. Increasing `YOLO_IMAGE_SIZE` can improve
-small-object recall at the cost of latency.
+available, or CPU otherwise. The local benchmark selected 512px: it measured
+38.0ms median CPU inference versus 34.8ms at 416px and 49.2ms at 640px on
+the bundled COCO bus image. The 512px run retained stronger person
+confidences than 416px; validate again with representative ESP32 frames.
+
+Each authenticated camera is tracked with Ultralytics ByteTrack. The optional
+tracker settings are `TRACK_HIGH_THRESHOLD`, `TRACK_LOW_THRESHOLD`,
+`TRACK_NEW_THRESHOLD`, `TRACK_BUFFER`, `TRACK_MATCH_THRESHOLD`, and
+`TRACK_FUSE_SCORE`. The backend passes the authenticated vehicle ID as the
+camera identity; clients cannot choose an arbitrary tracker identity.
+
+For local performance checks, run the same representative camera JPEGs with
+`YOLO_IMAGE_SIZE=416`, `512`, and `640` and compare `inferenceMs`, total
+latency, and missed detections. Do not infer accuracy changes from timing alone.
 
 The pretrained COCO model can confuse visually similar classes such as
 bottles and umbrellas. The service uses the model's own `result.names`

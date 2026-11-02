@@ -13,8 +13,8 @@ The frontend reads the following values from `frontend/.env`:
 Example:
 
 ```env
-VITE_API_BASE_URL=http://10.143.38.45:3000/api/v1
-VITE_WS_URL=ws://10.143.38.45:3000
+VITE_API_BASE_URL=http://localhost:3000/api/v1
+VITE_WS_URL=ws://localhost:3000
 VITE_LOCATIONIQ_TOKEN=YOUR_VALUE_HERE
 ```
 
@@ -61,8 +61,8 @@ REFRESH_TOKEN_EXPIRY=604800
 AI_SERVICE_URL=http://127.0.0.1:8000
 AI_SERVICE_TOKEN=YOUR_VALUE_HERE
 YOLO_ENABLED=true
-YOLO_CONFIDENCE_THRESHOLD=0.50
-YOLO_DETECTION_FPS=5
+YOLO_CONFIDENCE_THRESHOLD=0.35
+YOLO_DETECTION_FPS=10
 ```
 
 ## Required vs optional
@@ -83,16 +83,23 @@ Optional depending on deployment:
 
 The camera no longer connects directly to the Vite server. Set `APEX_BACKEND_HOST`
 in `esp32/firmware/APEX_ESP32_Firmware/firmware_secrets.h` to the laptop's
-reachable Wi-Fi address (for example `10.143.38.45`) and keep the backend port at
-`3000`. The camera authenticates to the backend WebSocket with the same device ID
+reachable Wi-Fi IPv4 address and keep the backend port at `3000`. The camera
+authenticates to the backend WebSocket with the same device ID
 and token, then the backend relays verified JPEG frames to the dashboard.
 
 The laptop and camera must be on the same reachable Wi-Fi network. Allow inbound
 TCP `3000` in Windows Defender Firewall for the backend (Private networks only).
-If the laptop changes networks, verify its IPv4 address and update both the
-frontend `.env` values and firmware configuration; do not assume `10.143.38.45`
-will remain valid. Prefer a DHCP reservation or a manual address outside the
-router's DHCP pool.
+For local LAN testing, run `ipconfig`, choose the laptop IPv4 address on the same
+subnet as the ESP32, and copy it into the untracked firmware secrets header.
+Verify the listener with:
+
+```powershell
+Get-NetTCPConnection -LocalPort 3000 -State Listen
+```
+
+If the laptop changes networks, repeat those checks rather than reusing an old
+hotspot address. The backend already listens on `0.0.0.0`; do not disable the
+firewall globally.
 
 The camera sketch prints an SCCB scan and the sensor PID/model reported by the
 installed `esp32-camera` driver. The RHYX M21-45 marking is not sufficient to

@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { randomBytes } from 'node:crypto';
 
 import User from '../models/User.model.js';
 import Vehicle from '../models/Vehicle.model.js';
@@ -14,20 +15,22 @@ import API_MESSAGE from '../constants/apiMessage.constant.js';
 
 const login = async (req, res, next) => {
   try {
-    const { username, password } = req.body;
+    const { username, password } = req.body || {};
 
     // Validate username
-    if (!username) {
+    if (typeof username !== 'string' || !username.trim()) {
       throw new ApiError(HTTP_STATUS.BAD_REQUEST, API_MESSAGE.USERNAME_REQUIRED);
     }
 
     // Validate password
-    if (!password) {
+    if (typeof password !== 'string' || !password) {
       throw new ApiError(HTTP_STATUS.BAD_REQUEST, API_MESSAGE.PASSWORD_REQUIRED);
     }
 
     // Find user
-    const user = await User.findOne({ username });
+    const user = await User.findOne({
+      $or: [{ username: username.trim() }, { email: username.trim().toLowerCase() }],
+    });
 
     if (!user) {
       throw new ApiError(HTTP_STATUS.UNAUTHORIZED, API_MESSAGE.INVALID_CREDENTIALS);
@@ -99,6 +102,76 @@ const login = async (req, res, next) => {
   }
 };
 
+const register = async (req, res, next) => {
+  try {
+    const { fullName, email, password, confirmPassword } = req.body || {};
+    const normalizedName = typeof fullName === 'string' ? fullName.trim() : '';
+    const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const namePattern = /^[\p{L}][\p{L}' -]{1,79}$/u;
+
+    if (!normalizedName || !namePattern.test(normalizedName)) {
+      throw new ApiError(HTTP_STATUS.BAD_REQUEST, 'Full name must be 2-80 valid characters');
+    }
+    if (!emailPattern.test(normalizedEmail) || normalizedEmail.length > 254) {
+      throw new ApiError(HTTP_STATUS.BAD_REQUEST, 'A valid email address is required');
+    }
+    if (
+      typeof password !== 'string' ||
+      password.length < 8 ||
+      password.length > 128 ||
+      !/[A-Z]/.test(password) ||
+      !/[a-z]/.test(password) ||
+      !/\d/.test(password)
+    ) {
+      throw new ApiError(
+        HTTP_STATUS.BAD_REQUEST,
+        'Password must be 8-128 characters with upper, lower, and numeric characters'
+      );
+    }
+    if (password !== confirmPassword) {
+      throw new ApiError(HTTP_STATUS.BAD_REQUEST, 'Passwords do not match');
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const vehicleId = `APEX-${randomBytes(3).toString('hex').toUpperCase()}`;
+    const user = await User.create({
+      fullName: normalizedName,
+      email: normalizedEmail,
+      username: normalizedEmail,
+      passwordHash,
+      vehicleId,
+      role: 'owner',
+    });
+
+    try {
+      await Vehicle.create({
+        vehicleId,
+        name: `${normalizedName}'s APEX Rover`,
+        owner: user._id,
+        deviceToken: randomBytes(24).toString('hex'),
+        status: 'offline',
+      });
+    } catch (error) {
+      await User.deleteOne({ _id: user._id });
+      throw error;
+    }
+
+    return res.status(HTTP_STATUS.CREATED).json(
+      new ApiResponse(
+        HTTP_STATUS.CREATED,
+        { user: { id: user._id, fullName: user.fullName, email: user.email } },
+        'Registration successful'
+      )
+    );
+  } catch (error) {
+    if (error?.code === 11000) {
+      return next(new ApiError(HTTP_STATUS.CONFLICT, 'An account with that email already exists'));
+    }
+    next(error);
+  }
+};
+
 const refreshAccessToken = async (req, res, next) => {
   try {
     const { refreshToken } = req.body;
@@ -156,4 +229,4 @@ const refreshAccessToken = async (req, res, next) => {
   }
 };
 
-export { login, refreshAccessToken };
+export { login, refreshAccessToken, register };

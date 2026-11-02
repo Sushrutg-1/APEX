@@ -68,7 +68,8 @@ const drawDetections = (context, canvas, detection) => {
     const x = rect.left + box.left * rect.scale;
     const y = rect.top + box.top * rect.scale;
     const color = getClassColor(object.className);
-    const label = `${object.className} ${Math.round(object.confidence * 100)}%`;
+    const trackLabel = Number.isInteger(object.trackId) ? ` #${object.trackId}` : '';
+    const label = `${object.className}${trackLabel} ${Math.round(object.confidence * 100)}%`;
     const labelWidth = context.measureText(label).width + 10;
     const labelY = y >= 22 ? y - 22 : y + 2;
 

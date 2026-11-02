@@ -45,8 +45,13 @@ function DetectionOverlay({ detection }) {
     }
 
     const drawn = detection ? drawDetections(context, canvas, detection) : 0;
+    const renderMs =
+      typeof detection?.receivedAt === 'number'
+        ? performance.now() - detection.receivedAt
+        : null;
     console.debug(
-      `YOLO canvas width=${canvas.clientWidth} height=${canvas.clientHeight} boxes=${drawn}`
+      `YOLO render width=${canvas.clientWidth} height=${canvas.clientHeight} boxes=${drawn}` +
+        (renderMs === null ? '' : ` renderMs=${renderMs.toFixed(1)}`)
     );
   }, [detection]);
 
