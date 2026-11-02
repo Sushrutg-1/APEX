@@ -1,6 +1,7 @@
 import asyncio
 import hmac
 import io
+import logging
 import os
 import threading
 import time
@@ -19,6 +20,8 @@ from ultralytics import YOLO
 from dotenv import load_dotenv
 
 load_dotenv()
+
+logger = logging.getLogger("apex.ai")
 
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
 MAX_IMAGE_PIXELS = 25_000_000
@@ -141,7 +144,7 @@ def warmup_model(model: YOLO, device: str, image_size: int) -> None:
 
 async def warmup_after_startup(app: FastAPI) -> None:
     started_at = time.perf_counter()
-    print("YOLO warmup started")
+    logger.info("YOLO warmup started")
     try:
         await run_in_threadpool(
             warmup_model,
@@ -151,13 +154,13 @@ async def warmup_after_startup(app: FastAPI) -> None:
         )
         app.state.inference_ready = True
         elapsed_ms = (time.perf_counter() - started_at) * 1000
-        print(f"YOLO warmup completed in {elapsed_ms:.1f}ms")
+        logger.info("YOLO warmup completed in %.1fms", elapsed_ms)
     except asyncio.CancelledError:
-        print("YOLO warmup cancelled during shutdown")
+        logger.info("YOLO warmup cancelled during shutdown")
         raise
-    except Exception as error:
+    except Exception:
         app.state.inference_ready = False
-        print(f"YOLO warmup failed: {error}")
+        logger.exception("YOLO warmup failed")
 
 
 @asynccontextmanager
@@ -180,6 +183,7 @@ async def lifespan(app: FastAPI):
     print(
         f"YOLO model loaded: {model_path.name}; startup warmup deferred"
     )
+    logger.info("Scheduling YOLO warmup task after startup")
     warmup_task = asyncio.create_task(warmup_after_startup(app))
     yield
     warmup_task.cancel()
@@ -199,11 +203,7 @@ def is_model_loaded() -> bool:
 
 
 def can_accept_inference() -> bool:
-    return (
-        is_model_loaded()
-        and getattr(app.state, "inference_ready", False)
-        and not inference_lock.locked()
-    )
+    return is_model_loaded() and getattr(app.state, "inference_ready", False)
 
 
 async def read_jpeg(request: Request) -> bytes:
