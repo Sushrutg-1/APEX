@@ -95,3 +95,6 @@ firmware/**/firmware_secrets.h
 # ==========================================
 # END OF APEX GITIGNORE
 # ==========================================
+# ESP32 local credentials
+firmware_secrets.h
+**/firmware_secrets.h
