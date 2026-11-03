@@ -161,12 +161,17 @@ async def initialize_model(app: FastAPI, model_path: Path) -> None:
         app.state.model = loaded_model
         logger.info("YOLO model loaded: %s", model_path.name)
         logger.info("YOLO warmup started")
-        await run_in_threadpool(
-            warmup_model,
-            loaded_model,
-            "cpu",
-            app.state.image_size,
-        )
+        try:
+            await run_in_threadpool(
+                warmup_model,
+                loaded_model,
+                app.state.device,
+                app.state.image_size,
+            )
+        except Exception:
+            logger.exception(
+                "YOLO warmup failed; continuing with the loaded model"
+            )
         model_ready = True
         app.state.inference_ready = True
         elapsed_ms = (time.perf_counter() - started_at) * 1000
