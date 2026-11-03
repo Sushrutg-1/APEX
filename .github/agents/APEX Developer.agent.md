@@ -16,4 +16,4 @@ You are a coding agent working on the APEX project.
 - Explain modified files, test results, and remaining hardware configuration steps.
 - Ask for approval when required by workspace permissions or terminal execution policies.
 
-For the current task, fix the APEX laptop IP configuration, ESP32-CAM connectivity, backend device health tracking, and dashboard unavailable states. Use `10.143.38.45` as the intended laptop IP, verify the actual network configuration, and preserve existing telemetry, events, and snapshot history.
+For the current task, fix the APEX laptop IP configuration, ESP32-CAM connectivity, backend device health tracking, and dashboard unavailable states. Use `YOUR_LOCAL_IP` as the laptop IP placeholder, verify the actual network configuration, and preserve existing telemetry, events, and snapshot history.

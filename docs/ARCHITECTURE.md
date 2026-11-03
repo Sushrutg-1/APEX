@@ -1,83 +1,84 @@
 # APEX Architecture
 
-This project is a full-stack rover monitoring system with a React frontend, Express backend, MongoDB persistence, and a WebSocket-based control layer.
+APEX is divided into hardware, software, and storage components. Each
+component has a clear responsibility, while the backend connects the complete
+system.
 
-## High-level flow
+## System overview
+
+The ESP32 DevKit controls the rover and sends telemetry. The ESP32-CAM
+captures images. Both devices connect to the Node.js backend. The React
+frontend communicates with the backend using REST requests and WebSockets.
+MongoDB stores users, vehicles, events, and snapshots. The FastAPI AI service
+processes selected JPEG frames.
 
 ```mermaid
 flowchart LR
-    Rover[ESP32-CAM / Rover device]
-    WebSocket[WebSocket control + telemetry layer]
-    Backend[Express API / services]
-    DB[(MongoDB)]
-    AI[YOLO detection service]
-    Frontend[React frontend]
-
-    Rover -->|Telemetry + camera stream| WebSocket
-    WebSocket --> Backend
-    Frontend -->|REST + WebSocket| Backend
-    Backend --> DB
-    Backend --> AI
-    AI --> Backend
-    Backend --> Frontend
+  D[ESP32 DevKit<br/>Telemetry and control] --> B[Node.js backend]
+  C[ESP32-CAM<br/>JPEG frames] --> B
+  F[React frontend<br/>REST and WebSocket] <--> B
+  B --> DB[(MongoDB)]
+  B --> AI[FastAPI<br/>YOLO11 and ByteTrack]
 ```
 
-## Frontend
+## Hardware architecture
 
-- Framework: React + Vite
-- State: Redux Toolkit
-- Routing: React Router
-- UI: custom components and CSS modules in the existing codebase
-- Key responsibility: dashboard display, vehicle monitoring, rover commands, geofence controls, and event/snapshot views
+The ESP32 DevKit reads the rover sensors, controls motors and servos, and
+communicates with the backend. The firmware includes pins for an ultrasonic
+sensor, flame sensor, buzzer, pan/tilt servos, motor driver, and GPS serial
+connection.
 
-## Backend
+The ESP32-CAM has a separate job. It initializes the camera in JPEG mode and
+sends binary frames. It does not connect directly to the React frontend.
 
-- Framework: Express.js
-- Runtime: Node.js
-- Authentication: JWT-based auth middleware with access/refresh tokens
-- API versions: `/api/v1`
-- Persistence: MongoDB with Mongoose models
+## Software architecture
 
-## Database
+### Frontend
 
-The project stores vehicles, users, events, and snapshots in MongoDB. The active schema contains:
+The frontend is a React/Vite application. It contains public authentication
+pages and protected dashboard pages. Redux Toolkit stores authentication and
+vehicle state. Axios is used for REST requests, while the browser WebSocket
+client receives live camera and telemetry data.
 
-- `User`
-- `Vehicle`
-- `Event`
-- `Snapshot`
+### Backend
 
-## Authentication
+The backend is an Express application started by `backend/src/server.js`.
+`backend/src/app.js` configures middleware, health routes, authentication
+routes, and vehicle routes. The WebSocket server handles dashboard, rover,
+and camera connections.
 
-Authentication is handled by the backend auth controller and middleware. The frontend stores login state in Redux and redirects to the protected dashboard route when a valid token is present.
+### Database
 
-## Real-time communication
+MongoDB stores the `User`, `Vehicle`, `Event`, and `Snapshot` models. A user is
+linked to a vehicle, and events and snapshots are linked to that vehicle.
+This relationship allows the backend to enforce owner-only access.
 
-APEX uses WebSockets for rover and camera communication. The backend exposes a websocket manager and vehicle/camera socket services for live monitoring and command dispatch.
+### AI service
 
-## ESP32 / camera flow
+`ai-service/main.py` exposes a FastAPI service. The backend sends JPEG bytes to
+`POST /detect`. YOLO11 returns object detections and ByteTrack maintains
+tracking IDs for each camera. The AI service is optional for live streaming;
+the camera feed can still work when detection is disabled.
 
-The rover camera and controller send telemetry and alert data into the backend. The backend also exposes endpoints for snapshot capture and YOLO inference.
+## Communication
 
-## Telemetry and event processing
+| Connection | Method | Data |
+| --- | --- | --- |
+| Frontend to backend | REST | Login, vehicle data, history, snapshots |
+| Frontend to backend | WebSocket | Live frames, telemetry, status, commands |
+| Rover to backend | WebSocket | Telemetry and command acknowledgements |
+| Camera to backend | WebSocket | Binary JPEG frames |
+| Backend to AI service | HTTP | JPEG detection requests and JSON results |
+| Backend to MongoDB | Mongoose | Users, vehicles, events, snapshots |
 
-Telemetry updates are stored on the `Vehicle` record and exposed via the `GET /vehicles/me` endpoint. Event records are created when geofence issues, snapshots, or detections occur.
+## Complete workflow
 
-## Snapshot processing
-
-Snapshots are stored as JPEG binary data, with metadata in the `Snapshot` model. Detection metadata is attached when an inference service is available.
-
-## Storage and retention
-
-Retention is implemented through soft-deletion fields on event and snapshot records:
-
-- `isDeleted: false` = active record
-- `deletedAt: null` = active record
-- `isDeleted: true` after retention window = soft deleted
-- records older than 12 months should be permanently removed by a scheduled cleanup process
-
-## Deployment notes
-
-- Frontend is served by Vite during local development
-- Backend runs as a Node.js Express process
-- Environment variables drive database access, tokens, and AI service configuration
+1. The user registers or logs in.
+2. The backend creates or loads the user's vehicle.
+3. The rover and camera authenticate with device ID and device token.
+4. The rover sends telemetry and waits for commands.
+5. The camera sends JPEG frames to the backend.
+6. The backend forwards frames to the dashboard.
+7. When enabled, the backend sends selected frames to the AI service.
+8. Detection results are sent to the dashboard and may create events and
+   snapshots.

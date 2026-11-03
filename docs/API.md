@@ -1,222 +1,69 @@
 # APEX API
 
-This document records the API endpoints that are actually implemented in the APEX backend.
+The backend API is mounted at `/api/v1`. For local development, the base URL
+is `http://localhost:3000/api/v1`.
 
-## Base URL
+## Authentication routes
 
-- Development: `http://localhost:3000/api/v1`
-- Production: configured by the backend environment
+| Method | Path | Purpose |
+| --- | --- | --- |
+| POST | `/auth/register` | Creates a user and vehicle |
+| POST | `/auth/login` | Logs in and returns access and refresh tokens |
+| POST | `/auth/refresh` | Refreshes an access token |
 
-## Authentication
+Example registration body:
 
-### POST /auth/login
+```json
+{
+  "fullName": "Example User",
+  "email": "user@example.com",
+  "password": "YOUR_PASSWORD",
+  "confirmPassword": "YOUR_PASSWORD"
+}
+```
 
-- Auth required: No
-- Description: Authenticates a registered user and returns a JWT payload plus refresh token details.
-- Request body:
-  ```json
-  {
-    "username": "owner",
-    "password": "secure-password"
-  }
-  ```
-- Success response: `200 OK`
-  ```json
-  {
-    "statusCode": 200,
-    "data": {
-      "userId": "<user-object-id>",
-      "username": "owner",
-      "vehicleId": "APEX-01",
-      "role": "owner",
-      "accessToken": "<jwt>",
-      "refreshToken": "<jwt>",
-      "expiresIn": 3600
-    },
-    "message": "User logged in successfully"
-  }
-  ```
-- Error responses:
-  - `400` invalid request payload
-  - `401` invalid credentials
+## Vehicle routes
 
-### POST /auth/refresh
+All routes below require a valid access token.
 
-- Auth required: Yes (valid refresh token)
-- Description: Refreshes the access token for an authenticated session.
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/vehicles/me` | Returns vehicle and telemetry |
+| GET | `/vehicles/me/provisioning` | Returns device setup information |
+| POST | `/vehicles/me/provisioning/token` | Rotates the device token |
+| GET | `/vehicles/me/geofence` | Returns the geofence |
+| PUT | `/vehicles/me/geofence` | Creates or updates the geofence |
+| DELETE | `/vehicles/me/geofence` | Removes the geofence |
+| GET | `/vehicles/me/history` | Returns events and snapshots |
+| POST | `/vehicles/me/detections` | Accepts a JPEG for detection |
+| POST | `/vehicles/me/snapshots` | Saves a JPEG snapshot |
+| GET | `/vehicles/me/snapshots/:snapshotId/image` | Returns a saved JPEG |
 
-## Vehicles
+JPEG endpoints require `Content-Type: image/jpeg`. The backend checks the
+authenticated user's vehicle ownership before returning data.
 
-### GET /vehicles/me
+## Health routes
 
-- Auth required: Yes
-- Description: Returns the current vehicle associated with the authenticated user.
-- Success response: `200 OK`
-  ```json
-  {
-    "statusCode": 200,
-    "data": {
-      "vehicleId": "APEX-01",
-      "name": "APEX Rover",
-      "status": "online",
-      "telemetry": {
-        "gpsFix": true,
-        "latitude": 19.076,
-        "longitude": 72.8777,
-        "gpsSpeed": 12.5,
-        "wifiRSSI": -52,
-        "roverState": "IDLE"
-      },
-      "lastTelemetryAt": "2026-01-01T12:00:00.000Z",
-      "geofence": {
-        "enabled": true,
-        "latitude": 19.076,
-        "longitude": 72.8777,
-        "radiusMeters": 100,
-        "state": "INSIDE"
-      }
-    },
-    "message": "Vehicle data retrieved"
-  }
-  ```
+These routes do not require authentication:
 
-### GET /vehicles/me/geofence
+- `GET /health`
+- `GET /ready`
+- `GET /health-check`
 
-- Auth required: Yes
-- Description: Retrieves the configured geofence.
+## WebSocket communication
 
-### PUT /vehicles/me/geofence
+The backend WebSocket server runs on the same server. Dashboard clients use
+the access token. The ESP32 rover and ESP32-CAM use `x-device-id` and
+`x-device-token`. The camera also sends `x-device-type: camera`.
 
-- Auth required: Yes
-- Description: Updates or creates the vehicle geofence.
-- Request body:
-  ```json
-  {
-    "enabled": true,
-    "latitude": 19.076,
-    "longitude": 72.8777,
-    "radiusMeters": 100
-  }
-  ```
-- Success response: `200 OK`
-  ```json
-  {
-    "statusCode": 200,
-    "data": {
-      "enabled": true,
-      "latitude": 19.076,
-      "longitude": 72.8777,
-      "radiusMeters": 100,
-      "state": "UNKNOWN"
-    },
-    "message": "Geofence updated"
-  }
-  ```
+- The rover sends JSON telemetry and receives JSON commands.
+- The camera sends binary JPEG frames.
+- The backend forwards valid frames to the dashboard.
 
-### DELETE /vehicles/me/geofence
+## Common errors
 
-- Auth required: Yes
-- Description: Disables the geofence and clears stored values.
-
-### GET /vehicles/me/history
-
-- Auth required: Yes
-- Description: Retrieves the latest active events and snapshots for the current vehicle.
-- Success response: `200 OK`
-  ```json
-  {
-    "statusCode": 200,
-    "data": {
-      "events": [
-        {
-          "_id": "<event-id>",
-          "vehicle": "<vehicle-id>",
-          "vehicleId": "APEX-01",
-          "type": "FIRE_DETECTED",
-          "message": "Fire detected near rover",
-          "latitude": 19.076,
-          "longitude": 72.8777,
-          "createdAt": "2026-01-01T12:00:00.000Z",
-          "updatedAt": "2026-01-01T12:00:00.000Z"
-        }
-      ],
-      "snapshots": [
-        {
-          "_id": "<snapshot-id>",
-          "vehicle": "<vehicle-id>",
-          "vehicleId": "APEX-01",
-          "latitude": 19.076,
-          "longitude": 72.8777,
-          "detectionStatus": "AVAILABLE",
-          "detectedObjects": [{ "className": "person", "confidence": 0.92 }],
-          "source": "ESP32-CAM live stream",
-          "createdAt": "2026-01-01T12:00:00.000Z"
-        }
-      ]
-    },
-    "message": "Vehicle history retrieved"
-  }
-  ```
-
-### POST /vehicles/me/detections
-
-- Auth required: Yes
-- Description: Sends a JPEG frame for YOLO object detection. This endpoint is used by the rover camera and AI workflow.
-- Content-Type: `image/jpeg`
-- Success response: `200 OK`
-  ```json
-  {
-    "statusCode": 200,
-    "data": {
-      "status": "ACTIVE",
-      "imageWidth": 640,
-      "imageHeight": 480,
-      "detections": [
-        {
-          "className": "person",
-          "confidence": 0.95,
-          "x": 0,
-          "y": 0,
-          "width": 57,
-          "height": 86
-        }
-      ],
-      "nextFrameInMs": 200
-    },
-    "message": "Object detections received"
-  }
-  ```
-
-### POST /vehicles/me/snapshots
-
-- Auth required: Yes
-- Description: Saves a JPEG snapshot from the rover and stores detection metadata if available.
-- Content-Type: `image/jpeg`
-- Success response: `201 Created`
-  ```json
-  {
-    "statusCode": 201,
-    "data": {
-      "_id": "<snapshot-id>",
-      "vehicle": "<vehicle-id>",
-      "vehicleId": "APEX-01",
-      "latitude": 19.076,
-      "longitude": 72.8777,
-      "detectedObjects": [{ "className": "person", "confidence": 0.92 }],
-      "detectionStatus": "AVAILABLE",
-      "source": "ESP32-CAM live stream",
-      "createdAt": "2026-01-01T12:00:00.000Z"
-    },
-    "message": "Snapshot saved"
-  }
-  ```
-
-### GET /vehicles/me/snapshots/:snapshotId/image
-
-- Auth required: Yes
-- Description: Returns the image bytes for a saved snapshot.
-- Response: binary JPEG image
-
-## Future / planned APIs
-
-The project currently does not implement a public registration API or full vehicle CRUD endpoints. Those are intentionally left undocumented as implemented features.
+- `400`: invalid request data.
+- `401`: missing or invalid login/device authentication.
+- `404`: requested vehicle, snapshot, or resource was not found.
+- `415`: detection or snapshot body is not `image/jpeg`.
+- `500`: server, database, or AI service error.

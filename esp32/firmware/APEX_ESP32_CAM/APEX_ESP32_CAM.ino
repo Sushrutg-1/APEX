@@ -4,11 +4,18 @@
 #include <Wire.h>
 #include <esp_camera.h>
 #include <img_converters.h>
+#include <time.h>
 
-#if __has_include("../APEX_ESP32_Firmware/firmware_secrets.h")
+#if __has_include("firmware_secrets.h")
+#include "firmware_secrets.h"
+#elif __has_include("../APEX_ESP32_Firmware/firmware_secrets.h")
 #include "../APEX_ESP32_Firmware/firmware_secrets.h"
 #else
 #error "Missing ../APEX_ESP32_Firmware/firmware_secrets.h. Create the local secrets header before compiling."
+#endif
+
+#if APEX_BACKEND_USE_TLS
+#include "render_root_ca.h"
 #endif
 
 #ifndef APEX_WIFI_SSID
@@ -23,13 +30,19 @@
 #ifndef APEX_DEVICE_TOKEN
 #error "APEX_DEVICE_TOKEN must be defined in firmware_secrets.h."
 #endif
+#ifndef APEX_BACKEND_USE_TLS
+#error "APEX_BACKEND_USE_TLS must be defined in firmware_secrets.h."
+#endif
+#ifndef APEX_BACKEND_PORT
+#error "APEX_BACKEND_PORT must be defined in firmware_secrets.h."
+#endif
 
 const int CAMERA_PWDN_PIN = 32;
 const int CAMERA_RESET_PIN = -1;
 const int CAMERA_XCLK_PIN = 0;
 const int CAMERA_SCCB_SDA_PIN = 26;
 const int CAMERA_SCCB_SCL_PIN = 27;
-const uint16_t BACKEND_PORT = 3000;
+const uint16_t BACKEND_PORT = APEX_BACKEND_PORT;
 const char* BACKEND_PATH = "/";
 const char* DEVICE_ID = "APEX-01";
 const unsigned long WIFI_RETRY_INTERVAL_MS = 10000;
@@ -44,6 +57,8 @@ bool cameraReady = false;
 bool cameraUsesJpeg = false;
 bool backendConnected = false;
 bool backendConfigured = false;
+bool clockSyncRequested = false;
+bool clockSynchronized = false;
 unsigned long lastWiFiAttempt = 0;
 unsigned long lastFrameSent = 0;
 unsigned long sendRetryNotBefore = 0;
@@ -247,6 +262,8 @@ void onWiFiEvent(WiFiEvent_t event, WiFiEventInfo_t info) {
     backendConnected = false;
   } else if (event == ARDUINO_EVENT_WIFI_STA_GOT_IP) {
     Serial.println("[WIFI] DHCP address acquired");
+    clockSyncRequested = false;
+    clockSynchronized = false;
     printWiFiDetails();
   } else {
     Serial.printf("[WIFI] Event=%d\n", event);
@@ -269,8 +286,31 @@ void startWiFi() {
 
 void maintainWiFi() {
   if (WiFi.status() == WL_CONNECTED) {
+#if APEX_BACKEND_USE_TLS
+    if (!clockSynchronized) {
+      if (!clockSyncRequested) {
+        configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+        clockSyncRequested = true;
+        Serial.println("[TLS] Waiting for NTP time before certificate validation");
+      }
+      if (time(nullptr) < 8 * 3600 * 2) {
+        return;
+      }
+      clockSynchronized = true;
+      Serial.println("[TLS] System time synchronized");
+    }
+#endif
     if (!backendConfigured) {
+#if APEX_BACKEND_USE_TLS
+      cameraSocket.beginSslWithCA(
+        APEX_BACKEND_HOST,
+        BACKEND_PORT,
+        BACKEND_PATH,
+        APEX_BACKEND_ROOT_CA
+      );
+#else
       cameraSocket.begin(APEX_BACKEND_HOST, BACKEND_PORT, BACKEND_PATH);
+#endif
       cameraSocket.setExtraHeaders(wsHeaders);
       cameraSocket.onEvent(onBackendEvent);
       cameraSocket.setReconnectInterval(WIFI_RETRY_INTERVAL_MS);
