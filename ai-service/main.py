@@ -22,6 +22,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 logger = logging.getLogger("apex.ai")
+logger.setLevel(logging.INFO)
+logger.propagate = True
 
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
 MAX_IMAGE_PIXELS = 25_000_000
@@ -144,10 +146,24 @@ def warmup_model(model: YOLO, device: str, image_size: int) -> None:
     )
 
 
+def execute_warmup(model: YOLO, device: str, image_size: int) -> None:
+    started_at = time.perf_counter()
+    logger.info("YOLO warmup execution started device=%s", device)
+    try:
+        warmup_model(model, device, image_size)
+    except Exception:
+        logger.exception("YOLO warmup execution failed")
+        raise
+    finally:
+        elapsed_ms = (time.perf_counter() - started_at) * 1000
+        logger.info("YOLO warmup execution finished in %.1fms", elapsed_ms)
+
+
 async def initialize_model(app: FastAPI, model_path: Path) -> None:
     global model, model_ready
 
     started_at = time.perf_counter()
+    logger.info("YOLO initialize_model entered")
     try:
         logger.info(
             "YOLO model initialization started: %s device=%s imgsz=%s personConf=%s",
@@ -156,14 +172,18 @@ async def initialize_model(app: FastAPI, model_path: Path) -> None:
             app.state.image_size,
             app.state.person_confidence,
         )
+        logger.info("YOLO waiting for model loading")
         loaded_model = await run_in_threadpool(load_model, model_path)
+        logger.info("YOLO model loading finished: %s", model_path.name)
         model = loaded_model
         app.state.model = loaded_model
-        logger.info("YOLO model loaded: %s", model_path.name)
+        logger.info("YOLO model assigned: %s", model_path.name)
         logger.info("YOLO warmup started")
+        logger.info("YOLO warmup submitted to threadpool device=%s", app.state.device)
+        logger.info("YOLO waiting for warmup completion")
         try:
             await run_in_threadpool(
-                warmup_model,
+                execute_warmup,
                 loaded_model,
                 app.state.device,
                 app.state.image_size,
@@ -172,8 +192,15 @@ async def initialize_model(app: FastAPI, model_path: Path) -> None:
             logger.exception(
                 "YOLO warmup failed; continuing with the loaded model"
             )
+        logger.info("YOLO warmup wait finished")
+        logger.info("YOLO readiness state updating: ready=True")
         model_ready = True
         app.state.inference_ready = True
+        logger.info(
+            "YOLO readiness state updated: model_ready=%s inference_ready=%s",
+            model_ready,
+            app.state.inference_ready,
+        )
         elapsed_ms = (time.perf_counter() - started_at) * 1000
         logger.info("YOLO warmup completed in %.1fms", elapsed_ms)
     except asyncio.CancelledError:
@@ -182,7 +209,15 @@ async def initialize_model(app: FastAPI, model_path: Path) -> None:
     except Exception:
         model_ready = False
         app.state.inference_ready = False
+        logger.info(
+            "YOLO readiness state updated: model_ready=%s inference_ready=%s",
+            model_ready,
+            app.state.inference_ready,
+        )
         logger.exception("YOLO model initialization or warmup failed")
+    finally:
+        elapsed_ms = (time.perf_counter() - started_at) * 1000
+        logger.info("YOLO initialize_model exited after %.1fms", elapsed_ms)
 
 
 @asynccontextmanager
