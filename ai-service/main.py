@@ -31,6 +31,8 @@ inference_lock = asyncio.Lock()
 inference_count = 0
 tracker_states = {}
 tracker_lock = threading.Lock()
+model = None
+model_ready = False
 
 
 def create_tracker() -> BYTETracker:
@@ -142,16 +144,30 @@ def warmup_model(model: YOLO, device: str, image_size: int) -> None:
     )
 
 
-async def warmup_after_startup(app: FastAPI) -> None:
+async def initialize_model(app: FastAPI, model_path: Path) -> None:
+    global model, model_ready
+
     started_at = time.perf_counter()
-    logger.info("YOLO warmup started")
     try:
-        await run_in_threadpool(
-            warmup_model,
-            app.state.model,
+        logger.info(
+            "YOLO model initialization started: %s device=%s imgsz=%s personConf=%s",
+            model_path.name,
             app.state.device,
             app.state.image_size,
+            app.state.person_confidence,
         )
+        loaded_model = await run_in_threadpool(load_model, model_path)
+        model = loaded_model
+        app.state.model = loaded_model
+        logger.info("YOLO model loaded: %s", model_path.name)
+        logger.info("YOLO warmup started")
+        await run_in_threadpool(
+            warmup_model,
+            loaded_model,
+            "cpu",
+            app.state.image_size,
+        )
+        model_ready = True
         app.state.inference_ready = True
         elapsed_ms = (time.perf_counter() - started_at) * 1000
         logger.info("YOLO warmup completed in %.1fms", elapsed_ms)
@@ -159,38 +175,36 @@ async def warmup_after_startup(app: FastAPI) -> None:
         logger.info("YOLO warmup cancelled during shutdown")
         raise
     except Exception:
+        model_ready = False
         app.state.inference_ready = False
-        logger.exception("YOLO warmup failed")
+        logger.exception("YOLO model initialization or warmup failed")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global model, model_ready
+
     model_path = Path(os.getenv("YOLO_MODEL") or "yolo11n.pt").expanduser()
     if not model_path.is_absolute() and model_path.parent == Path("."):
         model_path = Path.home() / ".cache" / "apex" / model_path.name
     model_path.parent.mkdir(parents=True, exist_ok=True)
+    model = None
+    model_ready = False
     app.state.model = None
     app.state.inference_ready = False
     app.state.device = get_inference_device()
     app.state.image_size = get_image_size()
     app.state.person_confidence = get_person_confidence()
-    print(
-        f"YOLO model initialization started: {model_path.name} "
-        f"device={app.state.device} imgsz={app.state.image_size} "
-        f"personConf={app.state.person_confidence}"
-    )
-    app.state.model = await run_in_threadpool(load_model, model_path)
-    print(
-        f"YOLO model loaded: {model_path.name}; startup warmup deferred"
-    )
-    logger.info("Scheduling YOLO warmup task after startup")
-    warmup_task = asyncio.create_task(warmup_after_startup(app))
+    logger.info("Scheduling YOLO model initialization after startup")
+    warmup_task = asyncio.create_task(initialize_model(app, model_path))
     yield
     warmup_task.cancel()
     try:
         await warmup_task
     except asyncio.CancelledError:
         pass
+    model = None
+    model_ready = False
     app.state.model = None
     app.state.inference_ready = False
 
@@ -199,11 +213,11 @@ app = FastAPI(title="APEX YOLO Inference", lifespan=lifespan)
 
 
 def is_model_loaded() -> bool:
-    return getattr(app.state, "model", None) is not None
+    return model is not None
 
 
 def can_accept_inference() -> bool:
-    return is_model_loaded() and getattr(app.state, "inference_ready", False)
+    return is_model_loaded() and model_ready
 
 
 async def read_jpeg(request: Request) -> bytes:
